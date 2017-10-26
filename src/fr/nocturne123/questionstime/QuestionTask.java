@@ -12,7 +12,9 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
 
-import fr.nocturne123.questionstime.Question.Types;
+import fr.nocturne123.questionstime.question.Question;
+import fr.nocturne123.questionstime.question.QuestionMulti;
+import fr.nocturne123.questionstime.question.Question.Types;
 
 public class QuestionTask implements Runnable {
 

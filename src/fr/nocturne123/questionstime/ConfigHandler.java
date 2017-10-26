@@ -8,7 +8,9 @@ import org.spongepowered.api.asset.Asset;
 
 import com.google.common.base.Preconditions;
 
-import fr.nocturne123.questionstime.Question.Types;
+import fr.nocturne123.questionstime.question.Question;
+import fr.nocturne123.questionstime.question.QuestionMulti;
+import fr.nocturne123.questionstime.question.Question.Types;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;

@@ -24,6 +24,8 @@ import org.spongepowered.api.text.format.TextColors;
 
 import com.google.inject.Inject;
 
+import fr.nocturne123.questionstime.question.Question;
+
 @Plugin(id = "questionstime", name = "QuestionsTime", version = "1.0.0", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123" })
 public class QuestionsTime {
 

@@ -1,7 +1,8 @@
-package fr.nocturne123.questionstime;
+package fr.nocturne123.questionstime.question;
 
 import java.util.Optional;
 
+import fr.nocturne123.questionstime.Prize;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 
 public class Question {

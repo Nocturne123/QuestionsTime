@@ -18,6 +18,8 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
 
+import fr.nocturne123.questionstime.question.Question;
+
 public class EventHandler {
 
 	@Listener
