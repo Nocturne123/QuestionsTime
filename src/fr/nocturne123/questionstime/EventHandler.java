@@ -42,13 +42,14 @@ public class EventHandler {
 										Text.builder(winner.getName()+" win !").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
 							if(!prize.getItems()[0].getType().equals(ItemTypes.AIR) || (prize.getMoney() > 0 && instance.getEconomy().isPresent()))
 							Task.builder().execute(task -> {
+								System.out.println("WOWOWO");
 								winner.sendMessage(Text.join(instance.qtPrefix, 
 										Text.builder(" Here's your rewards :").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
 								if(!prize.getItems()[0].getType().equals(ItemTypes.AIR)) {
 									for(int i = 0; i < prize.getItems().length; i++) {
 										winner.sendMessage(Text.join(instance.qtPrefix, 
-												Text.builder(" •"+prize.getItems()[i].getQuantity()+" * "+prize.getItems()[i].getType().getName())
-												.color(TextColors.BLUE).build()));
+												Text.builder(" • "+prize.getItems()[i].getQuantity()+" * ")
+												.color(TextColors.BLUE).build(), instance.readableItemID(prize.getItems()[i])));
 										winner.getInventory().offer(prize.getItems()[i].copy());
 									}
 								}
@@ -58,10 +59,10 @@ public class EventHandler {
 											Text.builder(" •"+prize.getMoney()+" ").color(TextColors.BLUE).build(),
 											ecoSevice.getDefaultCurrency().getDisplayName()));
 									Optional<UniqueAccount> account = ecoSevice.getOrCreateAccount(winner.getUniqueId());
-									if(account.isPresent()) {
+									if(account.isPresent())
 										account.get().deposit(ecoSevice.getDefaultCurrency(), BigDecimal.valueOf(prize.getMoney()),
 												Cause.of(e.getContext(), instance));
-									} else
+									else
 										instance.getLogger().error("The economy account for "+winner.getName()+" can't be found / created.");
 								} else if(!instance.getEconomy().isPresent())
 									instance.getLogger().info("No Economy Service found.");
@@ -73,18 +74,40 @@ public class EventHandler {
 						instance.sayNewQuestion();
 					}).async().delay(500, TimeUnit.MILLISECONDS)
 					.submit(instance.getContainer().getInstance().get());
+				} else if(e.getMessage().toPlain().contains("qt>") && e.getSource() instanceof Player) {
+					Player p = (Player) e.getSource();
+					String answer = e.getMessage().toPlain().substring(e.getMessage().toPlain().lastIndexOf("qt>") + 3);
+					p.sendMessage(Text.join(instance.qtPrefix, Text.builder(" "+answer).color(TextColors.YELLOW).style(TextStyles.BOLD).build(),
+							Text.builder(" isn't the right answer :(").color(TextColors.RED).style(TextStyles.NONE).build()));
+					if(ConfigHandler.isPersonnalAnswer())
+						e.setMessageCancelled(true);
+					if(q.getMalus().getMoney() > 0 && instance.getEconomy().isPresent()) {
+						EconomyService ecoSevice = instance.getEconomy().get();
+						p.sendMessage(Text.join(instance.qtPrefix, Text.builder(" You lose ").color(TextColors.RED)
+								.append(Text.builder(q.getMalus().getMoney()+" ").color(TextColors.DARK_RED).build()).build(),
+								ecoSevice.getDefaultCurrency().getDisplayName()));
+						Optional<UniqueAccount> account = ecoSevice.getOrCreateAccount(p.getUniqueId());
+						if(account.isPresent())
+							account.get().withdraw(ecoSevice.getDefaultCurrency(), BigDecimal.valueOf(q.getMalus().getMoney()), 
+									Cause.of(e.getContext(), instance));
+						else
+							instance.getLogger().error("The economy account for "+p.getName()+" can't be found / created.");
+					} else if(!instance.getEconomy().isPresent())
+						instance.getLogger().info("No Economy Service found.");
 				}
 			}
 		}
 	}
 	
 	@Listener
-	public void onPlayerDisconncted(ClientConnectionEvent.Disconnect e) {
+	public void onPlayerDisconnected(ClientConnectionEvent.Disconnect e) {
 		if(Sponge.getGame().getServer().getOnlinePlayers().size() == 1 && QuestionsTime.getInstance().getCurrentQuestion().isPresent()) {
 			QuestionsTime.getInstance().setPlayedQuestion(Optional.empty());
 			QuestionsTime.getInstance().getLogger().info("The last player connected has been disconnected while a question was said. The question has been stopped.");
 			QuestionsTime.getInstance().sayNewQuestion();
 		}
 	}
+	
+	
 	
 }

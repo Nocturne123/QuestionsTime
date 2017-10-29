@@ -9,8 +9,9 @@ public class QuestionMulti extends Question {
 	private String[] propositions;
 	private byte answer;
 	
-	public QuestionMulti(String question, Optional<CommentedConfigurationNode> prizeNode, String[] propositions, byte answer) {
-		super(question, prizeNode, String.valueOf(answer));
+	public QuestionMulti(String question, Optional<CommentedConfigurationNode> prizeNode, String[] propositions, byte answer, 
+			Optional<CommentedConfigurationNode> malusNode) {
+		super(question, prizeNode, String.valueOf(answer), malusNode);
 		this.propositions = propositions;
 		this.answer = answer;
 	}

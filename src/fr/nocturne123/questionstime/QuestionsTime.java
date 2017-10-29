@@ -2,6 +2,7 @@ package fr.nocturne123.questionstime;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Optional;
 
 import org.apache.commons.lang3.RandomUtils;
@@ -9,12 +10,14 @@ import org.slf4j.Logger;
 import org.spongepowered.api.Game;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.config.DefaultConfig;
+import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.state.GameInitializationEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedEvent;
 import org.spongepowered.api.event.network.ClientConnectionEvent;
 import org.spongepowered.api.event.service.ChangeServiceProviderEvent;
+import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.scheduler.Task;
@@ -26,7 +29,7 @@ import com.google.inject.Inject;
 
 import fr.nocturne123.questionstime.question.Question;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.0.0", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123" })
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.0.2", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123" })
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
@@ -63,21 +66,8 @@ public class QuestionsTime {
 			this.logger.warn("The file instance which is essential to access the config file was null. This shouldn't never happen. Try to restart the server ?");
 		this.currentQuestion = Optional.empty();
 		this.economy = Sponge.getServiceManager().provide(EconomyService.class);
-		Sponge.getEventManager().registerListeners(this, new EventHandler());
-		//CommandSpec command = CommandSpec.builder().description(Text.of("Permet de savoir ses coordonn�es"))
-		//		.executor(new Command())
-				// .arguments(GenericArguments.remainingJoinedStrings(Text.of("get")))
-		//		.build();
-		
+		Sponge.getEventManager().registerListeners(this, new EventHandler());	
 		//TODO: Appliquer damage sur item prize
-		//TODO: annonce prize bug
-		
-	//	game.getCommandManager().register(this, command, "coord");
-		// game.getEventManager().registerListener(this, new GadjetThunder(), this);
-//		game.getEventManager().registerListeners(this, new GadgetThunder());
-//		game.getEventManager().registerListeners(this, new Inventory());
-		// Sponge.getRegistry().register(WorldGeneratorModifier.class, new
-		// WorldManipulation());
 	}
 
 	@Listener
@@ -126,11 +116,6 @@ public class QuestionsTime {
 		.delayTicks(ConfigHandler.getCooldown())
 		.name("[QT]FixTimeQuestion")
 		.submit(this);
-		
-//		for(Question q : this.questions) {
-//			for(int i = 0; i < q.getPrize().getItems().length; i++)
-//				System.out.println(q.getPrize().getItems()[i]);
-//		}
 	}
 	
 	private void startIntervalQuestion() {
@@ -144,11 +129,39 @@ public class QuestionsTime {
 		  .delayTicks(ConfigHandler.getMinCooldown())
 		  .name("[QT]MainIntervalQuestion")
 		  .submit(this);
-		
-//		for(Question q : this.questions) {
-//			for(int i = 0; i < q.getPrize().getItems().length; i++)
-//				System.out.println(q.getPrize().getItems()[i]);
-//		}
+	}
+	
+	public Text readableItemID(ItemStack is) {
+		String itemID = is.getType().getId();
+		if(itemID.isEmpty())
+			return Text.of("itemIDEmpty");
+		String finalID = "";
+		Text textModID = Text.builder("").build();
+		if(itemID.startsWith("minecraft:")) {
+			finalID = itemID.substring(10);
+			finalID = finalID.substring(0, 1).toUpperCase()+finalID.substring(1, finalID.length());
+		} else if(itemID.contains(":") && !itemID.split(":")[0].isEmpty()) {
+			String modID = itemID.split(":")[0];
+			Optional<PluginContainer> pluginCont = Sponge.getPluginManager().getPlugin(modID);
+			if(pluginCont.isPresent()) {
+				String modName = pluginCont.get().getName();
+				String itemName = itemID.split(":")[1];
+				textModID = Text.builder(modName.substring(0, 1).toUpperCase()+modName.substring(1, modName.length())+": ").color(TextColors.BLUE).build();
+				finalID = itemName.substring(0, 1).toUpperCase()+itemName.substring(1, itemName.length());
+			} else {
+				this.logger.error("No mod with ID \""+modID+"\" was found.");
+				finalID = modID+" - "+itemID+" -> No found";
+			}
+		} else
+			finalID = "error{"+itemID+"}";
+		if(finalID.contains("_"))
+			finalID = finalID.replace('_', ' ');
+		Map<DataQuery, Object> keys = is.toContainer().getValues(true);
+		Text metadataText = Text.builder().build();
+		if(keys.containsKey(DataQuery.of("UnsafeDamage")) && keys.get(DataQuery.of("UnsafeDamage")) instanceof Integer)
+			if(((int) keys.get(DataQuery.of("UnsafeDamage"))) != 0)
+				metadataText = Text.builder(" "+keys.get(DataQuery.of("UnsafeDamage"))).color(TextColors.AQUA).build();
+		return Text.join(textModID, Text.builder(finalID).color(TextColors.WHITE).build(), metadataText);
 	}
 
 //	@Listener
@@ -158,21 +171,6 @@ public class QuestionsTime {
 //		p.sendMessage(Text.of("Bienvenue ", TextColors.GOLD, p.getName(), TextColors.BLUE, " !"));
 //	}
 
-	// @Listener
-	// public void onInteractBlock(InteractBlockEvent.Secondary e){
-	// Optional<Player> p = e.getCause().first(Player.class);
-	// BlockSnapshot block = e.getTargetBlock();
-	// logger.debug("test1");
-	// if(block == BlockTypes.DIRT){
-	// logger.debug("test2");
-	// if(p.isPresent()){
-	// logger.debug("test3");
-	// Player pl = p.get();
-	// pl.sendMessage(Text.builder("Tu viens de casser un block de dirt
-	// !").color(TextColors.AQUA).build());
-	// }
-	// }
-	// }
 	public Game getGame() {
 		return game;
 	}

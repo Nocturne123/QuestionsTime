@@ -9,8 +9,8 @@ import org.spongepowered.api.asset.Asset;
 import com.google.common.base.Preconditions;
 
 import fr.nocturne123.questionstime.question.Question;
-import fr.nocturne123.questionstime.question.QuestionMulti;
 import fr.nocturne123.questionstime.question.Question.Types;
+import fr.nocturne123.questionstime.question.QuestionMulti;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
@@ -25,13 +25,8 @@ public class ConfigHandler {
 	private static boolean isRandom;
 	private static int minCooldown;
 	private static int maxCooldown;
-//
-//	@Inject
-//	public ConfigHandler(@DefaultConfig(sharedRoot = false) File configFile, @DefaultConfig(sharedRoot = false) ConfigurationLoader<CommentedConfigurationNode> configurationLoader) {
-//		this.configFile = configFile;
-//		this.configurationLoader = configurationLoader;
-//		this.createConfig();
-//	}
+	private static boolean personnalAnswer;
+	private static int minConnected;
 	
 	public static void init(File file) {
 		try {
@@ -49,6 +44,17 @@ public class ConfigHandler {
 			isRandom = configNode.getNode("randomTime").getBoolean();
 			minCooldown = configNode.getNode("minCooldown").getInt();
 			maxCooldown = configNode.getNode("maxCooldown").getInt();
+			personnalAnswer = configNode.getNode("personnalAnswer").getBoolean();
+			minConnected = configNode.getNode("minConnected").getInt();
+			if(minConnected <= 0)
+				minConnected = 1;
+			if(cooldown <= 0)
+				cooldown = 200;
+			if(minCooldown <= 0)
+				minCooldown = 200;
+			if(maxCooldown <= 0)
+				maxCooldown = 400;
+			
 			CommentedConfigurationNode questions = configNode.getNode("questions");
 			loadQuestions(questions);
 			//configNode.getNode("is").setValue(TypeToken.of(ItemStack.class), ItemStack.builder().itemType(ItemTypes.STONE).quantity(5).build());
@@ -73,9 +79,10 @@ public class ConfigHandler {
 			String question = questionNodeInfo.getNode("question").getString();
 			String answer = questionNodeInfo.getNode("answer").getString();
 			CommentedConfigurationNode prize = questionNodeInfo.getNode("prize");
+			CommentedConfigurationNode malus = questionNodeInfo.getNode("malus");
 			
 			if(questionType == Types.SIMPLE) {
-				Question questionSimple = new Question(question, prize == null ? Optional.empty() : Optional.of(prize), answer);
+				Question questionSimple = new Question(question, prize == null ? Optional.empty() : Optional.of(prize), answer, Optional.of(malus));
 				QuestionsTime.getInstance().addQuestion(questionSimple);
 			} else if(questionType == Types.MULTI) {
 				if(StringUtils.isNumeric(answer) && Integer.valueOf(answer) <= 4 && Integer.valueOf(answer) > 0) {
@@ -87,7 +94,7 @@ public class ConfigHandler {
 					QuestionMulti questionMulti = new QuestionMulti(question, prize == null ? Optional.empty() : Optional.of(prize),
 							new String[] {propositionOne, propositionTwo == null ? "" : propositionTwo.getString(),
 									 propositionThree == null ? "" : propositionThree.getString(),
-									 propositionFour == null ? "" : propositionFour.getString()}, answerNumber);
+									 propositionFour == null ? "" : propositionFour.getString()}, answerNumber, Optional.of(malus));
 					QuestionsTime.getInstance().addQuestion(questionMulti);
 				}
 			} else
@@ -112,5 +119,12 @@ public class ConfigHandler {
 		return maxCooldown;
 	}
 	
+	public static boolean isPersonnalAnswer() {
+		return personnalAnswer;
+	}
+	
+	public static int getMinConnected() {
+		return minConnected;
+	}
 
 }

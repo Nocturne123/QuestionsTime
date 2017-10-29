@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+import org.spongepowered.api.Sponge;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.scheduler.Task;
@@ -13,8 +14,8 @@ import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
 
 import fr.nocturne123.questionstime.question.Question;
-import fr.nocturne123.questionstime.question.QuestionMulti;
 import fr.nocturne123.questionstime.question.Question.Types;
+import fr.nocturne123.questionstime.question.QuestionMulti;
 
 public class QuestionTask implements Runnable {
 
@@ -28,11 +29,12 @@ public class QuestionTask implements Runnable {
 	
 	@Override
 	public void run() {
-		if(instance.getGame().getServer().getOnlinePlayers().size() > 0) {
+		if(instance.getGame().getServer().getOnlinePlayers().size() >= ConfigHandler.getMinConnected()) {
 			Random rand = new Random();
 			ArrayList<Question> qs = instance.getQuestions();
 			Question q = qs.get(rand.nextInt(qs.size()));
 			Prize prize = q.getPrize();
+			Malus malus = q.getMalus();
 			instance.getGame().getServer().getOnlinePlayers().forEach(player -> {
 				player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" It's Question Time !").color(TextColors.YELLOW).build()));
 			});
@@ -52,13 +54,19 @@ public class QuestionTask implements Runnable {
 						player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" The winner win : ").color(TextColors.YELLOW).build()));
 						if(prize.getMoney() > 0 && QuestionsTime.getInstance().getEconomy().isPresent())
 							player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" •"+prize.getMoney()+" ").color(TextColors.BLUE).build(),
-									QuestionsTime.getInstance().getEconomy().get().getDefaultCurrency().getDisplayName()));
+									instance.getEconomy().get().getDefaultCurrency().getDisplayName()));
 						for(int i = 0; i < prize.getItems().length; i++) {
 							ItemStack is = prize.getItems()[i];
-							if(!is.getType().equals(ItemTypes.AIR))
-								player.sendMessage(Text.join(instance.qtPrefix, 
-										Text.builder(" •"+is.getQuantity()+" * "+is.getType().getName()).color(TextColors.BLUE).build()));
+							if(!is.getType().equals(ItemTypes.AIR)) {
+								player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" • "+is.getQuantity()+" * ").color(TextColors.BLUE).build(), 
+										instance.readableItemID(is)));
+							}
 						}
+					}
+					if(malus.isAnnounce() && malus.getMoney() > 0 && instance.getEconomy().isPresent()) {
+						player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" But a wrong answer : ").color(TextColors.RED).build()));
+						player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" • -"+malus.getMoney()+" ").color(TextColors.DARK_RED).build(),
+								instance.getEconomy().get().getDefaultCurrency().getDisplayName()));
 					}
 					player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" Answer with : \"").color(TextColors.YELLOW).append(
 							Text.builder("qt>{answer}").color(TextColors.AQUA).append(Text.builder("\"").color(TextColors.YELLOW).build()).build()).build()));
@@ -71,12 +79,10 @@ public class QuestionTask implements Runnable {
 			.name("[QT]AskQuestion")
 			.submit(instance);
 		} else {
-			instance.getLogger().info("No players connected, the question will be reported.");
+			instance.getLogger().info("No enough players ("+Sponge.getServer().getOnlinePlayers().size()+"/"+ConfigHandler.getMinConnected()+"), the question will be reported.");
 			instance.sayNewQuestion();
 		}
 	}
-	
-	
 
 
 

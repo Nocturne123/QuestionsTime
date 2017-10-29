@@ -1,7 +1,7 @@
 [{
     "modid": "questionstime",
     "name": "QuestionsTime",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "description": "Ask questions and gain prize for the winner",
     "authorList": [
         "Nocturne123"

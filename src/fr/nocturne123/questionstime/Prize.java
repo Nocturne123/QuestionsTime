@@ -102,96 +102,12 @@ public class Prize {
 									QuestionsTime.getInstance().getLogger().error("No variant named \""+variant+"\" has been found {\""+preItem+"\" -> \""+itemSplit[2]+"\")");
 							}
 						}
-	//					System.out.println("FINAL ITEM: "+it+" - "+damage+" - "+count);
-	//					String[] itemSplit = preItem.split(":");
-	//					if(itemSplit.length == 0)
-	//						QuestionsTime.getInstance().getLogger().warn("Prize : an item is empty (ex : \"\")");
-	//					else {
-	//						ItemType it = ItemTypes.AIR;
-	//						int damage = 0;
-	//						int count = 0;
-	//						if(itemSplit.length == 1)						
-	//							it = Sponge.getRegistry().getAllOf(ItemType.class).stream()
-	//									.filter(item2 -> item2.getId().equals("minecraft:"+itemSplit[0]))
-	//									.findFirst()
-	//									.orElse(ItemTypes.NONE);
-	//						isList.add(ItemStack.builder().itemType(it).quantity(1).build());
-	//					}
-	//						
-	//						ItemType it = ItemTypes.AIR;
-	//						int damage = 0;
-	//						int count = 1;
-	//						if(itemSplit.length == 3) {
-	//							it = Sponge.getRegistry().getAllOf(ItemType.class).stream()
-	//								.filter(item2 -> item2.getId().equals("minecraft:"+itemSplit[0]))
-	//								.findFirst()
-	//								.orElse(ItemTypes.NONE);
-	//							damage = StringUtils.isNumeric(itemSplit[1]) ? Integer.valueOf(itemSplit[2]) : 0;
-	//							count = itemSplit.length >= 4 && StringUtils.isNumeric(itemSplit[3]) ? Integer.valueOf(itemSplit[3]) : 1;
-	//						}
-	//						int damage = itemSplit.length >= 3 && StringUtils.isNumeric(itemSplit[2]) ? Integer.valueOf(itemSplit[2]) : 0;
-	//						int count = itemSplit.length >= 4 && StringUtils.isNumeric(itemSplit[3]) ? Integer.valueOf(itemSplit[3]) : 1;
-//						DataContainer datas = is.toContainer();
-//						datas.set(DataQuery.of("UnsafeDamage"), 3);
-//						is.setRawData(datas);
-	//					DataContainer lol = is.toContainer();
-	//					lol.set(DataQuery.of("/", "UnsafeDamage"), damage);
-	//					is.setRawData(lol);
-						
-	//					 ItemStack is2 = ItemStack.builder()
-	//					            .fromContainer(is.toContainer().set(DataQuery.of("UnsafeData"), damage))
-	//					            .build();
-						
 						isList.add(is);
 					} catch (Exception e) {
 						QuestionsTime.getInstance().getLogger().error("Error when loading an item {\""+preItem+"\"}");
 						e.printStackTrace();
 					}
 				});
-//				try {
-//				ItemStack is = itemNode.getValue(TypeToken.of(ItemStack.class));
-//				
-////				ItemStackSnapshot isSnap = is.createSnapshot();
-////				isSnap.
-//				
-//				System.out.println("ADD ITEM PRIZE :"+is);
-//				isList.add(is);
-//			} catch (ObjectMappingException e) {
-//				e.printStackTrace();
-//			}
-//				System.out.println("ITEM NUMBER : "+items.getChildrenList().size());
-//				int position = 1;
-//				while(iter.hasNext()) {
-//					CommentedConfigurationNode item = iter.next();
-//					try {
-//						ItemStack is = item.getNode("item"+position).getValue(TypeToken.of(ItemStack.class));
-//						System.out.println("ADD ITEM PRIZE :"+is);
-//						isList.add(is);
-//					} catch (ObjectMappingException e) {
-//						e.printStackTrace();
-//					}
-//				
-//					String[] itemData = item.getString().toLowerCase().split("-");
-//					ItemType type = Sponge.getRegistry().getAllOf(ItemType.class).stream()
-//								.filter(item2 -> item2.getId().equals(itemData[0]+":"+itemData[1]))
-//								.findFirst()
-//								.orElse(ItemTypes.NONE);
-//					int damage = itemData.length >= 3 ? StringUtils.isNumeric(itemData[2]) ? Integer.valueOf(itemData[2]) : 0 : 0;
-//					int count = itemData.length >= 4 ? StringUtils.isNumeric(itemData[3]) ? Integer.valueOf(itemData[3]) : 1 : 1;
-//					ItemStack is = ItemStack.builder().itemType(type).quantity(count).build();
-//					is.toContainer().set(DataQuery.of("UnsafeDamage"), damage);
-//					System.out.println(is.toContainer().get(DataQuery.of("UnsafeDamage")).get()+" - "+damage+" - "+is.toContainer().getValues(true));
-//					Iterator<Entry<DataQuery, Object>> iter2 = is.toContainer().getValues(true).entrySet().iterator();
-//					while(iter2.hasNext()) {
-//						Entry<DataQuery, Object> entry = iter2.next();
-//						if(entry.getKey().asString("/").equals("UnsafeDamage"))
-//							entry.setValue(damage);
-//					}
-//					for(Entry<DataQuery, Object> entry : is.toContainer().getValues(true).entrySet()) {
-//						if(entry.getKey().asString("/").equals("UnsafeDamage"))
-//							entry.setValue(damage);
-//					}
-//				}
 				if(!isList.isEmpty()) {
 					this.items = new ItemStack[isList.size()];
 					this.items = isList.toArray(this.items);
