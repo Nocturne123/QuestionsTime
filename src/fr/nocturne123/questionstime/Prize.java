@@ -6,12 +6,13 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.spongepowered.api.CatalogType;
 import org.spongepowered.api.Sponge;
+import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.data.key.Key;
 import org.spongepowered.api.item.ItemType;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 
-import ninja.leaping.configurate.commented.CommentedConfigurationNode;
+import ninja.leaping.configurate.ConfigurationNode;
  
 public class Prize {
 
@@ -20,20 +21,20 @@ public class Prize {
 	private ItemStack[] items;
 	
 	@SuppressWarnings("unchecked")
-	public Prize(Optional<CommentedConfigurationNode> prizeNode) {
-		if(prizeNode.isPresent()) {
-			CommentedConfigurationNode prize = prizeNode.get();
+	public Prize(Optional<ConfigurationNode> prizeNode) {
+		if(prizeNode != null && prizeNode.isPresent()) {
+			ConfigurationNode prize = prizeNode.get();
 			this.money = prize.getNode("money") != null ? prize.getNode("money").getInt() : 0;
 			this.announce = prize.getNode("announce") != null ? prize.getNode("announce").getBoolean() : true;
 			
-			CommentedConfigurationNode items = prize.getNode("items");
+			ConfigurationNode items = prize.getNode("items");
 			if(items.getValue() != null) {
 				ArrayList<ItemStack> isList = new ArrayList<>();
 				items.getChildrenList().forEach(preItemNode -> {
 					String preItem = preItemNode.getString();
 					try {
 						String[] itemSplit = preItem.split(";");
-						ItemType it = ItemTypes.AIR;
+						ItemType it = ItemTypes.NONE;
 						int damage = 0;
 						int count = 1;
 						String variant = "";
@@ -48,14 +49,14 @@ public class Prize {
 								QuestionsTime.getInstance().getLogger().warn("An item's id contains only the mod's id or the name's item."
 										+ " Delete the \":\" or add the mod's id / name's item (\""+preItem+"\")");
 							else {
-								it = Sponge.getRegistry().getType(ItemType.class, (itemID[0]+":"+itemID[1])).orElse(ItemTypes.AIR);
-								if(!itemID[1].equals("air") && it.getType().equals(ItemTypes.AIR))
-									QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID+"\") doesn't exist");
+								it = Sponge.getRegistry().getType(ItemType.class, (itemID[0]+":"+itemID[1])).orElse(ItemTypes.NONE);
+								if(!itemID[1].equals("NONE") && it.getType().equals(ItemTypes.NONE))
+									QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID[1]+"\") doesn't exist");
 							}
 						} else {
 							String itemID = preItem.contains(";") ? itemSplit[0] : preItem;
-							it = Sponge.getRegistry().getType(ItemType.class, ("minecraft:"+itemID)).orElse(ItemTypes.AIR);
-							if(!itemID.equals("air") && it.getType().equals(ItemTypes.AIR))
+							it = Sponge.getRegistry().getType(ItemType.class, ("minecraft:"+itemID)).orElse(ItemTypes.NONE);
+							if(!itemID.equals("NONE") && it.getType().equals(ItemTypes.NONE))
 								QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID+"\") doesn't exist");
 						}
 						if(itemSplit.length >= 2) {
@@ -78,30 +79,39 @@ public class Prize {
 						}
 						
 						ItemStack is = ItemStack.builder().itemType(it).quantity(count).build();
+						
 						boolean variantExist = false;
-						if(!variant.isEmpty()) {
+						if(!variant.isEmpty() && QuestionsTime.getInstance().getSpongeAPI() == 7) {
 							searchVariant: {
-								for(@SuppressWarnings("rawtypes") Key key : Sponge.getRegistry().getAllOf(Key.class)) {
-									if(key.getElementToken().isSubtypeOf(CatalogType.class)) {
-										for(CatalogType element : Sponge.getRegistry().getAllOf((Class<CatalogType>) key.getElementToken().getRawType())) {
-											if(!element.getName().equals("none")) {
-												if(element.getName().equals(variant)) {
-													variantExist = true;
-													if(is.supports(key)) {
-														is.offer(key, element);
-														break searchVariant;
-													} else
-														QuestionsTime.getInstance().getLogger().info("The variant \""+variant+"\" isn't applicable for the item \""
-																+is.getType().getId()+"\" {\""+preItem+"\" -> \""+itemSplit[2]+"\"}");
-												}
+							for(@SuppressWarnings("rawtypes") Key key : Sponge.getRegistry().getAllOf(Key.class)) {
+								if(CatalogType.class.isAssignableFrom(key.getElementToken().getRawType())) {
+									for(CatalogType element : Sponge.getRegistry().getAllOf((Class<CatalogType>) key.getElementToken().getRawType())) {
+										
+										String elmtID = element.getId();
+										if(elmtID.contains(":")) {
+											if(elmtID.split(":").length >= 2 && !elmtID.split(":")[1].isEmpty())
+												elmtID = elmtID.split(":")[1];
+										}
+
+										if(!elmtID.equals("none")) {
+											if(elmtID.equals(variant)) {
+												variantExist = true;
+												if(is.supports(key)) {
+													is.offer(key, element);
+													break searchVariant;
+												} else
+													QuestionsTime.getInstance().getLogger().info("The variant \""+variant+"\" isn't applicable for the item \""
+															+is.getItem().getId()+"\" {\""+preItem+"\" -> \""+itemSplit[1]+"\"}");
 											}
 										}
 									}
 								}
-								if(!variantExist)
-									QuestionsTime.getInstance().getLogger().error("No variant named \""+variant+"\" has been found {\""+preItem+"\" -> \""+itemSplit[2]+"\")");
 							}
-						}
+							if(!variantExist)
+								QuestionsTime.getInstance().getLogger().error("No variant named \""+variant+"\" has been found {\""+preItem+"\" -> \""+itemSplit[1]+"\")");
+							}
+						} else if(damage > 0)
+							is = ItemStack.builder().fromContainer(is.toContainer().set(DataQuery.of("UnsafeDamage"), damage)).build();
 						isList.add(is);
 					} catch (Exception e) {
 						QuestionsTime.getInstance().getLogger().error("Error when loading an item {\""+preItem+"\"}");
@@ -112,14 +122,23 @@ public class Prize {
 					this.items = new ItemStack[isList.size()];
 					this.items = isList.toArray(this.items);
 				} else
-					this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.AIR).quantity(1).build()};
+					this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.NONE).quantity(1).build()};
 			} else
-				this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.AIR).quantity(1).build()};
+				this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.NONE).quantity(1).build()};
 		} else {
 			this.money = 0;
 			this.announce = true;
-			this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.AIR).quantity(1).build()};
+			this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.NONE).quantity(1).build()};
 		}
+	}
+	
+	public Prize(int money, boolean announce, ItemStack[] is) {
+		this.money = money > 0 ? money : 0;
+		this.announce = announce;
+		if(is != null)
+			this.items = is;
+		else
+			this.items = new ItemStack[] {ItemStack.builder().itemType(ItemTypes.NONE).quantity(1).build()};
 	}
 	
 	public int getMoney() {

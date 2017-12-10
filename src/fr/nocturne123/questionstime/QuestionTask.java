@@ -36,11 +36,14 @@ public class QuestionTask implements Runnable {
 			Prize prize = q.getPrize();
 			Malus malus = q.getMalus();
 			instance.getGame().getServer().getOnlinePlayers().forEach(player -> {
-				player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" It's Question Time !").color(TextColors.YELLOW).build()));
+				if(!instance.isCreator(player.getUniqueId()))
+					player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" It's Question Time !").color(TextColors.YELLOW).build()));
 			});
 			
 			Task.builder().execute(task -> {
 				instance.getGame().getServer().getOnlinePlayers().forEach(player -> {
+					if(instance.isCreator(player.getUniqueId()))
+						return;
 					player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" "+q.getQuestion()).color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
 	
 					if(q.getType() == Types.MULTI) {
@@ -49,7 +52,7 @@ public class QuestionTask implements Runnable {
 							player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" •"+(i+1)+"] "+qMulti.getPropositions()[i]).color(TextColors.AQUA).build()));
 					}
 					if(prize.isAnnounce() && 
-							((prize.getItems().length > 0 && !prize.getItems()[0].getType().equals(ItemTypes.AIR)) || 
+							((prize.getItems().length > 0 && !prize.getItems()[0].getItem().equals(ItemTypes.NONE)) || 
 									(prize.getMoney() >= 0 && instance.getEconomy().isPresent()))) {
 						player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" The winner win : ").color(TextColors.YELLOW).build()));
 						if(prize.getMoney() > 0 && QuestionsTime.getInstance().getEconomy().isPresent())
@@ -57,9 +60,9 @@ public class QuestionTask implements Runnable {
 									instance.getEconomy().get().getDefaultCurrency().getDisplayName()));
 						for(int i = 0; i < prize.getItems().length; i++) {
 							ItemStack is = prize.getItems()[i];
-							if(!is.getType().equals(ItemTypes.AIR)) {
+							if(!is.getItem().equals(ItemTypes.NONE)) {
 								player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" • "+is.getQuantity()+" * ").color(TextColors.BLUE).build(), 
-										instance.readableItemID(is)));
+										TextUtils.readableItemID(is)));
 							}
 						}
 					}
@@ -69,7 +72,7 @@ public class QuestionTask implements Runnable {
 								instance.getEconomy().get().getDefaultCurrency().getDisplayName()));
 					}
 					player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" Answer with : \"").color(TextColors.YELLOW).append(
-							Text.builder("qt>{answer}").color(TextColors.AQUA).append(Text.builder("\"").color(TextColors.YELLOW).build()).build()).build()));
+							Text.builder("qt>answer").color(TextColors.AQUA).append(Text.builder("\"").color(TextColors.YELLOW).build()).build()).build()));
 					player.sendMessage(Text.join(instance.qtPrefix, Text.builder(" May the best win !").color(TextColors.YELLOW).build()));
 					instance.setPlayedQuestion(Optional.of(q));
 				});

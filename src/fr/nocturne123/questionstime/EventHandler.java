@@ -4,13 +4,19 @@ import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
+import org.spongepowered.api.CatalogType;
 import org.spongepowered.api.Sponge;
+import org.spongepowered.api.data.DataQuery;
+import org.spongepowered.api.data.key.Key;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
-import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.message.MessageChannelEvent;
 import org.spongepowered.api.event.network.ClientConnectionEvent;
+import org.spongepowered.api.item.ItemType;
 import org.spongepowered.api.item.ItemTypes;
+import org.spongepowered.api.item.inventory.ItemStack;
+import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.service.economy.EconomyService;
 import org.spongepowered.api.service.economy.account.UniqueAccount;
@@ -19,92 +25,474 @@ import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
 
 import fr.nocturne123.questionstime.question.Question;
+import fr.nocturne123.questionstime.question.Question.Types;
+import fr.nocturne123.questionstime.question.QuestionCreator;
 
 public class EventHandler {
 
 	@Listener
 	public void onReceiveMessage(MessageChannelEvent e) {
-		if(e.getSource() != null && e.getSource() instanceof Player) {
-			if(QuestionsTime.getInstance().getCurrentQuestion().isPresent()) {
-				QuestionsTime instance = QuestionsTime.getInstance();
-				Question q = instance.getCurrentQuestion().get();
-				if(e.getMessage().toPlain().endsWith("qt>"+q.getAnswer())) {
-					QuestionsTime.getInstance().setPlayedQuestion(Optional.empty());
-					Player winner = (Player) e.getSource();
-					Prize prize = q.getPrize();
-					Task.builder().execute(wait -> {
-						Sponge.getServer().getOnlinePlayers().forEach(player -> {
-							if(player.getUniqueId().equals(winner.getUniqueId()))
-									player.sendMessage(Text.join(instance.qtPrefix, 
-											Text.builder(" You win !").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
-							else
-								player.sendMessage(Text.join(instance.qtPrefix, 
-										Text.builder(winner.getName()+" win !").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
-							if(!prize.getItems()[0].getType().equals(ItemTypes.AIR) || (prize.getMoney() > 0 && instance.getEconomy().isPresent()))
-							Task.builder().execute(task -> {
-								System.out.println("WOWOWO");
-								winner.sendMessage(Text.join(instance.qtPrefix, 
-										Text.builder(" Here's your rewards :").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
-								if(!prize.getItems()[0].getType().equals(ItemTypes.AIR)) {
-									for(int i = 0; i < prize.getItems().length; i++) {
-										winner.sendMessage(Text.join(instance.qtPrefix, 
-												Text.builder(" • "+prize.getItems()[i].getQuantity()+" * ")
-												.color(TextColors.BLUE).build(), instance.readableItemID(prize.getItems()[i])));
-										winner.getInventory().offer(prize.getItems()[i].copy());
-									}
-								}
-								if(prize.getMoney() > 0 && instance.getEconomy().isPresent()) {
-									EconomyService ecoSevice = instance.getEconomy().get();
-									winner.sendMessage(Text.join(instance.qtPrefix, 
-											Text.builder(" •"+prize.getMoney()+" ").color(TextColors.BLUE).build(),
-											ecoSevice.getDefaultCurrency().getDisplayName()));
-									Optional<UniqueAccount> account = ecoSevice.getOrCreateAccount(winner.getUniqueId());
-									if(account.isPresent())
-										account.get().deposit(ecoSevice.getDefaultCurrency(), BigDecimal.valueOf(prize.getMoney()),
-												Cause.of(e.getContext(), instance));
-									else
-										instance.getLogger().error("The economy account for "+winner.getName()+" can't be found / created.");
-								} else if(!instance.getEconomy().isPresent())
-									instance.getLogger().info("No Economy Service found.");
-							}).async()
-							.delayTicks(60)
-							.name("[QT]SendWinnerPrize")
-							.submit(instance.getContainer().getInstance().get());
-						});
-						instance.sayNewQuestion();
-					}).async().delay(500, TimeUnit.MILLISECONDS)
-					.submit(instance.getContainer().getInstance().get());
-				} else if(e.getMessage().toPlain().contains("qt>") && e.getSource() instanceof Player) {
-					Player p = (Player) e.getSource();
-					String answer = e.getMessage().toPlain().substring(e.getMessage().toPlain().lastIndexOf("qt>") + 3);
-					p.sendMessage(Text.join(instance.qtPrefix, Text.builder(" "+answer).color(TextColors.YELLOW).style(TextStyles.BOLD).build(),
-							Text.builder(" isn't the right answer :(").color(TextColors.RED).style(TextStyles.NONE).build()));
-					if(ConfigHandler.isPersonnalAnswer())
-						e.setMessageCancelled(true);
-					if(q.getMalus().getMoney() > 0 && instance.getEconomy().isPresent()) {
+		if(e.getCause() != null && e.getCause().first(Player.class).isPresent() && !e.getCause().containsType(PluginContainer.class)) {
+			QuestionsTime instance = QuestionsTime.getInstance();
+			Player p = (Player) e.getCause().first(Player.class).get();
+			String message = e.getMessage().toPlain();
+			if(message.endsWith("qtc>start") && !instance.isCreator(p.getUniqueId())) {
+				instance.addCreator(p.getUniqueId());
+				this.handleQuestionCreation(message, p, instance, e);
+				return;
+			}
+			if(message.contains("qt>") && !instance.isCreator(p.getUniqueId()) && instance.getCurrentQuestion().isPresent())
+				this.handleQuestionAnswer(message, p, instance, e);
+			if(message.contains("qtc>") && instance.isCreator(p.getUniqueId()))
+				this.handleQuestionCreation(message, p, instance, e);
+		}
+	}
+	
+	private void handleQuestionAnswer(String message, Player p, QuestionsTime instance, MessageChannelEvent e) {
+		Question q = instance.getCurrentQuestion().get();
+		if(message.endsWith("qt>"+q.getAnswer())) {
+			QuestionsTime.getInstance().setPlayedQuestion(Optional.empty());
+			Prize prize = q.getPrize();
+			Task.builder().execute(wait -> {
+				Sponge.getServer().getOnlinePlayers().forEach(player -> {
+					if(player.getUniqueId().equals(p.getUniqueId()))
+							player.sendMessage(Text.join(instance.qtPrefix, 
+									Text.builder(" You win !").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
+					else
+						player.sendMessage(Text.join(instance.qtPrefix, 
+								Text.builder(" "+p.getName()+" win !").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
+				});
+			}).async().delay(500, TimeUnit.MILLISECONDS)
+			.submit(instance.getContainer().getInstance().get());
+			
+			if(!prize.getItems()[0].getItem().equals(ItemTypes.NONE) || (prize.getMoney() > 0 && instance.getEconomy().isPresent()))
+				Task.builder().execute(task -> {
+					p.sendMessage(Text.join(instance.qtPrefix, 
+							Text.builder(" Here's your rewards :").color(TextColors.YELLOW).style(TextStyles.BOLD).build()));
+					if(!prize.getItems()[0].getItem().equals(ItemTypes.NONE)) {
+						for(int i = 0; i < prize.getItems().length; i++) {
+							p.sendMessage(Text.join(instance.qtPrefix, 
+									Text.builder(" • "+prize.getItems()[i].getQuantity()+" * ")
+									.color(TextColors.BLUE).build(), TextUtils.readableItemID(prize.getItems()[i])));
+							p.getInventory().offer(prize.getItems()[i].copy());
+						}
+					}
+					if(prize.getMoney() > 0 && instance.getEconomy().isPresent()) {
 						EconomyService ecoSevice = instance.getEconomy().get();
-						p.sendMessage(Text.join(instance.qtPrefix, Text.builder(" You lose ").color(TextColors.RED)
-								.append(Text.builder(q.getMalus().getMoney()+" ").color(TextColors.DARK_RED).build()).build(),
+						p.sendMessage(Text.join(instance.qtPrefix, 
+								Text.builder(" •"+prize.getMoney()+" ").color(TextColors.BLUE).build(),
 								ecoSevice.getDefaultCurrency().getDisplayName()));
 						Optional<UniqueAccount> account = ecoSevice.getOrCreateAccount(p.getUniqueId());
 						if(account.isPresent())
-							account.get().withdraw(ecoSevice.getDefaultCurrency(), BigDecimal.valueOf(q.getMalus().getMoney()), 
-									Cause.of(e.getContext(), instance));
+							account.get().deposit(ecoSevice.getDefaultCurrency(), BigDecimal.valueOf(prize.getMoney()),
+									e.getCause());
 						else
 							instance.getLogger().error("The economy account for "+p.getName()+" can't be found / created.");
 					} else if(!instance.getEconomy().isPresent())
 						instance.getLogger().info("No Economy Service found.");
+				}).async()
+				.delayTicks(60)
+				.name("[QT]SendWinnerPrize")
+				.submit(instance.getContainer().getInstance().get());
+			instance.sayNewQuestion();
+		} else if(message.contains("qt>")) {
+			String answer = message.substring(message.lastIndexOf("qt>") + 3);
+			p.sendMessage(Text.join(instance.qtPrefix, Text.builder(" "+answer).color(TextColors.YELLOW).style(TextStyles.BOLD).build(),
+					Text.builder(" isn't the right answer :(").color(TextColors.RED).style(TextStyles.NONE).build()));
+			if(ConfigHandler.isPersonnalAnswer())
+				e.setMessageCancelled(true);
+			if(q.getMalus().getMoney() > 0 && instance.getEconomy().isPresent()) {
+				EconomyService ecoSevice = instance.getEconomy().get();
+				p.sendMessage(Text.join(instance.qtPrefix, Text.builder(" You lose ").color(TextColors.RED)
+						.append(Text.builder(q.getMalus().getMoney()+" ").color(TextColors.DARK_RED).build()).build(),
+						ecoSevice.getDefaultCurrency().getDisplayName()));
+				Optional<UniqueAccount> account = ecoSevice.getOrCreateAccount(p.getUniqueId());
+				if(account.isPresent())
+					account.get().withdraw(ecoSevice.getDefaultCurrency(), BigDecimal.valueOf(q.getMalus().getMoney()), e.getCause());
+				else
+					instance.getLogger().error("The economy account for "+p.getName()+" can't be found / created.");
+			} else if(!instance.getEconomy().isPresent())
+				instance.getLogger().info("No Economy Service found.");
+		}
+	}
+	
+	private void handleQuestionCreation(String message, Player p, QuestionsTime instance, MessageChannelEvent e) {
+		if(instance.getQuestionCreator(p.getUniqueId()).isPresent()) {
+			QuestionCreator qc = instance.getQuestionCreator(p.getUniqueId()).get();
+			String answer = message.substring(message.lastIndexOf("qtc>") + 4);
+			if(answer.equals("stop"))
+				qc.setStop();
+			if(answer.equals("confirm") && qc.isConfirm())
+				qc.nextStep();
+			else
+				qc.setPreviousResponse(answer);
+			
+			switch(qc.getCurrentStep()) {
+			case -1:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("yes")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to quit the Question Creator ? The question will not be saved !"));
+						qc.setConfirm();
+					} else if(answer.equals("no")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to continue the creation of the command ?"));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The answer need to be \"", "qtc>yes OR no", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to stop the Question Creator ?"));
+					p.sendMessage(TextUtils.creatorComposed("Answer with \"", "qtc>yes OR no", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 0:
+				if(qc.isHalfconfirm()) {
+					p.sendMessage(TextUtils.creatorComposed("Is \"", answer, "\" the right question ?"));
+					qc.setConfirm();
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("What's the question ? Answer with \"", "qtc>question", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 1:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("simple")) {
+						p.sendMessage(TextUtils.creatorComposed("The question's type is \"", "simple", "\". That's right ?"));
+						qc.setConfirm();
+					} else if(answer.equals("proposition")) {
+						p.sendMessage(TextUtils.creatorComposed("The question's type is \"", "proposition", "\". That's right ?"));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The question's type can only be \"", "simple OR proposition", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(Text.join(TextUtils.creatorComposed("What's the question's type ? Answer with \"", "qtc>simple", "\" or \""), 
+							Text.builder("qtc>proposition").color(TextColors.BLUE).build(),
+							Text.builder("\"").color(TextColors.GREEN).build()));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 2:
+				if(qc.isHalfconfirm()) {
+					p.sendMessage(TextUtils.creatorComposed("The first proposition is \"", answer, "\". It is correct ?"));
+					qc.setConfirm();
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("What's the first proposition ? Answer with \"", "qtc>proposition1", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 3:
+				if(qc.isHalfconfirm()) {
+					p.sendMessage(TextUtils.creatorComposed("The second proposition is \"", answer, "\". It is correct ?"));
+					qc.setConfirm();
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("What's the second proposition ? Answer with \"", "qtc>proposition2", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 4:
+				if(qc.isHalfconfirm()) {
+					p.sendMessage(TextUtils.creatorComposed("The third proposition is \"", answer, "\". It is correct ?"));
+					qc.setConfirm();
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("What's the third proposition ? Answer with \"", "qtc>proposition3", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 5:
+				if(qc.isHalfconfirm()) {
+					p.sendMessage(TextUtils.creatorComposed("The fourth proposition is \"", answer, "\". It is correct ?"));
+					qc.setConfirm();
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("What's the fourth proposition ? Answer with \"", "qtc>proposition4", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 6:
+				if(qc.isConfirm() || qc.isHalfconfirm()) {
+					if(qc.getQuestionType() == Types.MULTI) {
+						if(answer.equals("1") || answer.equals("2") || answer.equals("3") || answer.equals("4")) {
+							p.sendMessage(TextUtils.creatorComposed("The right proposition is \"", answer, "\". It is correct ?"));
+							qc.setConfirm();
+						} else {
+							p.sendMessage(TextUtils.creatorComposed("The right proposition can only be \"", "1 OR 2 OR 3 OR 4", "\""));
+							qc.setHalfconfirm();
+						}
+					} else if(qc.getQuestionType() == Types.SIMPLE) {
+						p.sendMessage(TextUtils.creatorComposed("The answer is \"", answer, "\". It is correct ?"));
+						qc.setConfirm();
+					}
+					
+				} else if(qc.getQuestionType() == Types.MULTI) {
+					p.sendMessage(TextUtils.creatorComposed("What's the right proposition ? Answer with \"", "qtc>1 OR 2 OR 3 OR 4", "\""));
+					qc.setHalfconfirm();
+				} else if(qc.getQuestionType() == Types.SIMPLE) {
+					p.sendMessage(TextUtils.creatorComposed("What's the answer of the question ? Answer with \"", "qtc>answer", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 7:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("yes")) {
+						p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" You really want to add prizes ?")));
+						qc.setConfirm();
+					} else if(answer.equals("no")) {
+						p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" You really don't want to add prizes ?")));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The answer can only be \"", "yes OR no", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("Do you want to add prizes ? Answer with \"", "qtc>yes OR no", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 8:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("yes")) {
+						p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" You really want to announce the prize after the question was asked ?")));
+						qc.setConfirm();
+					} else if(answer.equals("no")) {
+						p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" You really want to not announce the prize after the question was asked ?")));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The answer can only be \"", "yes OR no", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("Do you want to announce the prize ? Answer with \"", "qtc>yes OR no", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 9:
+				if(qc.isHalfconfirm()) {
+					if(StringUtils.isNumeric(answer)) {
+						if(answer.length() <= 18) {
+							if(Long.valueOf(answer) > 0) {
+								p.sendMessage(TextUtils.creatorComposed("Is \"", answer, "\" the right amount ?"));
+								qc.setConfirm();
+							} else {
+								p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" You really don't want to add money as a prize ?")));
+								qc.setConfirm();
+							}
+						} else {
+							p.sendMessage(TextUtils.creatorComposed("\"", answer,"\" is too big !"));
+							qc.setHalfconfirm();
+						}
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("\"", answer,"\" isn't a number or a positive number"));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(Text.join(TextUtils.creatorComposed("What is the amount of ",
+							instance.getEconomy().get().getDefaultCurrency().getDisplayName().toPlain(), " ? Answer with \""), TextUtils.creatorSpecial("qtc>amount"),
+							TextUtils.creatorNormal("\" (if you doesn't want, just put 0)")));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 10:
+				if(qc.isConfirm() && !answer.equals("[ModID]:{ItemID};[Variant];[Count]")) {
+					ItemStack is = this.getStackBySyntax(answer, p);
+					if(is.getItem() != ItemTypes.NONE) {
+						qc.addItemPrize(is);
+						p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" Added \""), TextUtils.readableItemID(is), 
+								Text.builder(" * "+is.getQuantity()).color(TextColors.LIGHT_PURPLE).build(),
+								TextUtils.creatorNormal("\"")));
+					} else
+						p.sendMessage(TextUtils.creatorComposed("Incorrect syntax : \"", answer, "\""));
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("Add an item as prize with \"", "qtc>[ModID]:{ItemID};[Variant];[Count]", "\""));
+					p.sendMessage(TextUtils.creatorComposed("Which \"", "{...}", "\" is obligatory"));
+					p.sendMessage(TextUtils.creatorComposed("And \"", "[...]", "\" optionnal"));
+					p.sendMessage(TextUtils.creatorComposed("If you don't want to add items, type \"", "qtc> confirm", "\" directly"));
+					qc.setConfirm();
+				}
+				break;
+			case 11:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("yes")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to add a malus ?"));
+						qc.setConfirm();
+					} else if(answer.equals("no")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to not add a malus ?"));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The answer can only be \"", "yes OR no", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("Do you want to add a malus for a wrong answer ? Answer with \"", "qtc>yes OR no", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 12:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("yes")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to announce the malus ?"));
+						qc.setConfirm();
+					} else if(answer.equals("no")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to not announce the malus ?"));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The answer can only be \"", "yes OR no", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("Do you want to announce the malus after the question ? Answer with \"", "qtc>yes OR no", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 13:
+				if(qc.isHalfconfirm()) {
+					if(StringUtils.isNumeric(answer)) {
+						if(answer.length() <= 18) {
+							if(Long.valueOf(answer) > 0) {
+								p.sendMessage(TextUtils.creatorComposed("Is \"", answer, "\" the right amount ?"));
+								qc.setConfirm();
+							} else {
+								p.sendMessage(Text.join(instance.qtPrefix, TextUtils.creatorNormal(" You really don't want to add money as a malus ?")));
+								qc.setConfirm();
+							}
+						} else {
+							p.sendMessage(TextUtils.creatorComposed("\"", answer,"\" is too big !"));
+							qc.setHalfconfirm();
+						}
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("\"", answer,"\" isn't a number or a positive number"));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(Text.join(TextUtils.creatorComposed("What is the amount of ",
+							instance.getEconomy().get().getDefaultCurrency().getDisplayName().toPlain(), " ? Answer with \""), TextUtils.creatorSpecial("qtc>amount"),
+							TextUtils.creatorNormal("\" (if you doesn't want, just put 0)")));
+					qc.setHalfconfirm();
+				}
+				break;
+			case 14:
+				if(qc.isHalfconfirm()) {
+					if(answer.equals("yes")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want start the question ?"));
+						qc.setConfirm();
+					} else if(answer.equals("no")) {
+						p.sendMessage(TextUtils.creatorNormalWithPrefix("Do you really want to just save the question ?"));
+						qc.setConfirm();
+					} else {
+						p.sendMessage(TextUtils.creatorComposed("The answer can only be \"", "yes OR no", "\""));
+						qc.setHalfconfirm();
+					}
+				} else {
+					p.sendMessage(TextUtils.creatorComposed("Good, it's finish ! The question is now registered ! Do you want to start the question or just save it ? "
+							+ "Answer with \"",
+							"qtc>yes OR no", "\""));
+					qc.setHalfconfirm();
+				}
+				break;
+			}
+			e.setMessageCancelled(true);
+		} else
+			instance.getLogger().error("I think a spacetime error occurred because this is -normally- impossible to happen. But, yea, I think you found a bug. It is cool ?");
+	}
+	
+	/**Syntax : [ModID]:{ItemID};[Variant];[Count]
+	 * Where {...} is obligatory and [...] not */
+	@SuppressWarnings("unchecked")
+	private ItemStack getStackBySyntax(String itemSyntax, Player sender) {
+		String[] itemSplit = itemSyntax.split(";");
+		ItemType it = ItemTypes.NONE;
+		int damage = 0;
+		int count = 1;
+		String variant = "";
+		
+		if((itemSplit.length >= 1 && itemSplit[0].contains(":")) || (!itemSyntax.contains(";") && itemSyntax.contains(":"))) {
+			String[] itemID = itemSyntax.split(":");
+			if(itemID[1].contains(";"))
+				itemID[1] = itemID[1].split(";")[0];
+			if(itemID.length > 2)
+				QuestionsTime.getInstance().getLogger().warn("An item's id contains two or more \":\" (\""+itemSyntax+"\")");
+			else if(itemID.length < 2)
+				QuestionsTime.getInstance().getLogger().warn("An item's id contains only the mod's id or the name's item."
+						+ " Delete the \":\" or add the mod's id / name's item (\""+itemSyntax+"\")");
+			else {
+				it = Sponge.getRegistry().getType(ItemType.class, (itemID[0]+":"+itemID[1])).orElse(ItemTypes.NONE);
+				if(!itemID[1].equals("NONE") && it.getType().equals(ItemTypes.NONE))
+					QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID[1]+"\") doesn't exist");
+			}
+		} else {
+			String itemID = itemSyntax.contains(";") ? itemSplit[0] : itemSyntax;
+			it = Sponge.getRegistry().getType(ItemType.class, ("minecraft:"+itemID)).orElse(ItemTypes.NONE);
+			if(!itemID.equals("NONE") && it.getType().equals(ItemTypes.NONE))
+				QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID+"\") doesn't exist");
+		}
+		if(itemSplit.length >= 2) {
+			if(StringUtils.isNumeric(itemSplit[1])) {
+				if(Integer.valueOf(itemSplit[1]) >= 0)
+					damage = Integer.valueOf(itemSplit[1]);
+				else
+					QuestionsTime.getInstance().getLogger().warn("The items's damage is negative (\""+itemSyntax+"\" -> \""+itemSplit[1]+"\")");
+			} else
+				variant = itemSplit[1];
+		}
+		if(itemSplit.length >= 3) {
+			if(StringUtils.isNumeric(itemSplit[2])) {
+				if(Integer.valueOf(itemSplit[2]) >= 0)
+					count = Integer.valueOf(itemSplit[2]);
+				else
+					QuestionsTime.getInstance().getLogger().warn("The items's count is negative (\""+itemSyntax+"\" -> \""+itemSplit[2]+"\")");
+			} else
+				QuestionsTime.getInstance().getLogger().warn("The item's count isn't an number (\""+itemSyntax+"\" -> \""+itemSplit[2]+"\")");
+		}
+		
+		ItemStack is = ItemStack.builder().itemType(it).quantity(count).build();
+		
+		boolean variantExist = false;
+		if(!variant.isEmpty() && QuestionsTime.getInstance().getSpongeAPI() == 7) {
+			searchVariant: {
+			for(@SuppressWarnings("rawtypes") Key key : Sponge.getRegistry().getAllOf(Key.class)) {
+				if(CatalogType.class.isAssignableFrom(key.getElementToken().getRawType())) {
+					for(CatalogType element : Sponge.getRegistry().getAllOf((Class<CatalogType>) key.getElementToken().getRawType())) {
+						
+						String elmtID = element.getId();
+						if(elmtID.contains(":")) {
+							if(elmtID.split(":").length >= 2 && !elmtID.split(":")[1].isEmpty())
+								elmtID = elmtID.split(":")[1];
+						}
+
+						if(!elmtID.equals("none")) {
+							if(elmtID.equals(variant)) {
+								variantExist = true;
+								if(is.supports(key)) {
+									is.offer(key, element);
+									break searchVariant;
+								} else
+									QuestionsTime.getInstance().getLogger().info("The variant \""+variant+"\" isn't applicable for the item \""
+											+is.getItem().getId()+"\" {\""+itemSyntax+"\" -> \""+itemSplit[1]+"\"}");
+							}
+						}
+					}
 				}
 			}
-		}
+			if(!variantExist)
+				QuestionsTime.getInstance().getLogger().error("No variant named \""+variant+"\" has been found {\""+itemSyntax+"\" -> \""+itemSplit[1]+"\")");
+			}
+		} else if(damage > 0)
+			is = ItemStack.builder().fromContainer(is.toContainer().set(DataQuery.of("UnsafeDamage"), damage)).build();
+		return is;
 	}
 	
 	@Listener
 	public void onPlayerDisconnected(ClientConnectionEvent.Disconnect e) {
-		if(Sponge.getGame().getServer().getOnlinePlayers().size() == 1 && QuestionsTime.getInstance().getCurrentQuestion().isPresent()) {
-			QuestionsTime.getInstance().setPlayedQuestion(Optional.empty());
-			QuestionsTime.getInstance().getLogger().info("The last player connected has been disconnected while a question was said. The question has been stopped.");
-			QuestionsTime.getInstance().sayNewQuestion();
+		QuestionsTime instance = QuestionsTime.getInstance();
+		if(Sponge.getGame().getServer().getOnlinePlayers().size() == 1 && instance.getCurrentQuestion().isPresent()) {
+			instance.setPlayedQuestion(Optional.empty());
+			instance.getLogger().info("The last player connected has been disconnected while a question was said. The question has been stopped.");
+			instance.sayNewQuestion();
+		}
+		if(instance.isCreator(e.getTargetEntity().getUniqueId())) {
+			instance.removeCreator(e.getTargetEntity().getUniqueId());
+			instance.getLogger().info("The player's name "+e.getTargetEntity().getName()+" was creating a question when he disconnected. The question will not be save.");
 		}
 	}
 	

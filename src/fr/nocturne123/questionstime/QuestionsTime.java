@@ -2,22 +2,25 @@ package fr.nocturne123.questionstime;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.Optional;
+import java.util.UUID;
 
+import org.apache.commons.lang3.CharUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.spongepowered.api.Game;
+import org.spongepowered.api.Platform.Component;
 import org.spongepowered.api.Sponge;
+import org.spongepowered.api.command.source.ConsoleSource;
+import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.DefaultConfig;
-import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.state.GameInitializationEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedEvent;
-import org.spongepowered.api.event.network.ClientConnectionEvent;
 import org.spongepowered.api.event.service.ChangeServiceProviderEvent;
-import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.scheduler.Task;
@@ -25,11 +28,15 @@ import org.spongepowered.api.service.economy.EconomyService;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 
+import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
 
 import fr.nocturne123.questionstime.question.Question;
+import fr.nocturne123.questionstime.question.QuestionCreator;
+import fr.nocturne123.questionstime.question.QuestionSerializer;
+import ninja.leaping.configurate.objectmapping.serialize.TypeSerializers;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.0.2", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123" })
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.0", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
@@ -54,29 +61,47 @@ public class QuestionsTime {
 			.build()).build()).build();
 	private Optional<Question> currentQuestion;
 	private Optional<EconomyService> economy;
+	private ArrayList<QuestionCreator> questionCreator;
 
 	@SuppressWarnings("static-access")
 	@Listener
 	public void onServerInitialization(GameInitializationEvent e) {
-		this.questions = new ArrayList<>();
 		this.instance = this;
+		this.getConsole().sendMessage(TextUtils.Console.creatorNormalWithPrefix("╔───────────────────╗"));
+		this.getConsole().sendMessage(TextUtils.Console.creatorNormalWithPrefix("|   QUESTIONSTIME   |"));
+		this.getConsole().sendMessage(TextUtils.Console.creatorNormalWithPrefix("╚───────────────────╝"));
+		TypeSerializers.getDefaultSerializers().registerType(TypeToken.of(Question.class), new QuestionSerializer());
+		this.questions = new ArrayList<>();
 		if(file != null)
 			ConfigHandler.init(file);
 		else
 			this.logger.warn("The file instance which is essential to access the config file was null. This shouldn't never happen. Try to restart the server ?");
 		this.currentQuestion = Optional.empty();
+		this.questionCreator = new ArrayList<>();
 		this.economy = Sponge.getServiceManager().provide(EconomyService.class);
-		Sponge.getEventManager().registerListeners(this, new EventHandler());	
-		//TODO: Appliquer damage sur item prize
+		Sponge.getEventManager().registerListeners(this, new EventHandler());
+	
+		CommandSpec commandQTCreate = CommandSpec.builder()
+				.description(Text.builder("Create a question easily").color(TextColors.GREEN).build())
+				.permission("questionstime.command.create")
+				.executor(new CommandCreateQuestion())
+				.build();
+				
+		CommandSpec commandQTBase = CommandSpec.builder()
+				.description(Text.builder("The main QuestionsTime command").color(TextColors.YELLOW).build())
+				.permission("questionstime.command.base")
+				.child(commandQTCreate, "create")
+				.build();
+		Sponge.getCommandManager().register(this, commandQTBase, "questionstime", "qt");
 	}
 
 	@Listener
 	public void onServerStart(GameStartedServerEvent e) {
 		if(this.questions.size() > 0) {
-			this.logger.info("Loaded "+this.questions.size()+" questions !");
+			this.getConsole().sendMessage(TextUtils.Console.creatorComposed("Loaded ", ""+this.questions.size(), " question(s) !"));
 			this.sayNewQuestion();
 		} else
-			this.logger.error("No questions were register. Do you add questions ?");
+			this.getConsole().sendMessage(TextUtils.Console.creatorError("No questions were register. Do you add questions ?"));
 	}
 
 	@Listener
@@ -88,17 +113,6 @@ public class QuestionsTime {
 	public void onServerProviderChange(ChangeServiceProviderEvent e) {
 		if(e.getService().equals(EconomyService.class))
 			this.economy = Optional.of((EconomyService) e.getNewProviderRegistration().getProvider());
-	}
-	
-	@Listener
-	public void onPlayerConnected(ClientConnectionEvent.Login event) {
-//		User p = event.getTargetUser();
-//		p.getInventory().offer(ItemStack.builder().itemType(ItemTypes.STONE).quantity(1).add(Keys.ITEM_DURABILITY, 1).build());
-//		for(Question q : this.questions) {
-//			for(int i = 0; i < q.getPrize().getItems().length; i++) {
-//				p.getInventory().offer(q.getPrize().getItems()[i].copy());
-//			}
-//		}
 	}
 	
 	public void sayNewQuestion() {
@@ -130,46 +144,6 @@ public class QuestionsTime {
 		  .name("[QT]MainIntervalQuestion")
 		  .submit(this);
 	}
-	
-	public Text readableItemID(ItemStack is) {
-		String itemID = is.getType().getId();
-		if(itemID.isEmpty())
-			return Text.of("itemIDEmpty");
-		String finalID = "";
-		Text textModID = Text.builder("").build();
-		if(itemID.startsWith("minecraft:")) {
-			finalID = itemID.substring(10);
-			finalID = finalID.substring(0, 1).toUpperCase()+finalID.substring(1, finalID.length());
-		} else if(itemID.contains(":") && !itemID.split(":")[0].isEmpty()) {
-			String modID = itemID.split(":")[0];
-			Optional<PluginContainer> pluginCont = Sponge.getPluginManager().getPlugin(modID);
-			if(pluginCont.isPresent()) {
-				String modName = pluginCont.get().getName();
-				String itemName = itemID.split(":")[1];
-				textModID = Text.builder(modName.substring(0, 1).toUpperCase()+modName.substring(1, modName.length())+": ").color(TextColors.BLUE).build();
-				finalID = itemName.substring(0, 1).toUpperCase()+itemName.substring(1, itemName.length());
-			} else {
-				this.logger.error("No mod with ID \""+modID+"\" was found.");
-				finalID = modID+" - "+itemID+" -> No found";
-			}
-		} else
-			finalID = "error{"+itemID+"}";
-		if(finalID.contains("_"))
-			finalID = finalID.replace('_', ' ');
-		Map<DataQuery, Object> keys = is.toContainer().getValues(true);
-		Text metadataText = Text.builder().build();
-		if(keys.containsKey(DataQuery.of("UnsafeDamage")) && keys.get(DataQuery.of("UnsafeDamage")) instanceof Integer)
-			if(((int) keys.get(DataQuery.of("UnsafeDamage"))) != 0)
-				metadataText = Text.builder(" "+keys.get(DataQuery.of("UnsafeDamage"))).color(TextColors.AQUA).build();
-		return Text.join(textModID, Text.builder(finalID).color(TextColors.WHITE).build(), metadataText);
-	}
-
-//	@Listener
-//	public void onPlayerJoin(ClientConnectionEvent.Join e) {
-//		Player p = e.getTargetEntity();
-//
-//		p.sendMessage(Text.of("Bienvenue ", TextColors.GOLD, p.getName(), TextColors.BLUE, " !"));
-//	}
 
 	public Game getGame() {
 		return game;
@@ -207,4 +181,44 @@ public class QuestionsTime {
 		return economy;
 	}
 
+	public void addCreator(UUID uuid) {
+		this.questionCreator.add(new QuestionCreator(uuid));
+	}
+	
+	public void removeCreator(UUID uuid) {
+		Iterator<QuestionCreator> iter = this.questionCreator.iterator();
+		while(iter.hasNext()) {
+			QuestionCreator qc = iter.next();
+			if(qc.getCreator().equals(uuid)) {
+				iter.remove();
+				break;
+			}
+		}
+	}
+	
+	public boolean isCreator(UUID uuid) {
+		for(QuestionCreator qc : this.questionCreator) {
+			if(qc.getCreator().equals(uuid))
+				return true;
+		}
+		return false;
+	}
+	
+	public Optional<QuestionCreator> getQuestionCreator(UUID uuid) {
+		for(QuestionCreator qc : this.questionCreator) {
+			if(qc.getCreator().equals(uuid))
+				return Optional.of(qc);
+		}
+		return Optional.empty();
+	}
+
+	public int getSpongeAPI() {
+		char version = Sponge.getPlatform().getContainer(Component.API).getVersion().orElse("0").charAt(0);
+		return StringUtils.isNumeric(String.valueOf(version)) ? CharUtils.toIntValue(version) : 0;
+	}
+	
+	public ConsoleSource getConsole() {
+		return Sponge.getGame().getServer().getConsole();
+	}
+	
 }
