@@ -12,17 +12,20 @@ public class Question {
 	private String answer;
 	private Prize prize;
 	private Malus malus;
+	private int timer;
 	
-	public Question(String question, Optional<ConfigurationNode> prizeNode, String answer, Optional<ConfigurationNode> malusNode) {
+	public Question(String question, Optional<ConfigurationNode> prizeNode, String answer, Optional<ConfigurationNode> malusNode, int timer) {
 		this.question = question;
 		this.answer = answer;
+		this.timer = timer >= 0 ? timer >= 86400 ? 86399 : timer : 0;
 		this.prize = new Prize(prizeNode);
 		this.malus = new Malus(malusNode);
 	}
 	
-	public Question(String question, Prize prize, String answer, Malus malus) {
+	public Question(String question, Prize prize, String answer, Malus malus, int timer) {
 		this.question = question;
 		this.answer = answer;
+		this.timer = timer >= 0 ? timer >= 86400 ? 86399 : timer : 0;
 		this.prize = prize;
 		this.malus = malus;
 	}
@@ -54,6 +57,14 @@ public class Question {
 	
 	public Malus getMalus() {
 		return malus;
+	}
+	
+	public int getTimer() {
+		return this.timer;
+	}
+	
+	public boolean isTimed() {
+		return timer > 0 ? true : false;
 	}
 	
 	public enum Types {

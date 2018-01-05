@@ -31,12 +31,13 @@ public class QuestionSerializer implements TypeSerializer<Question>{
 		
 		String question = node.getNode("question").getString();
 		String answer = node.getNode("answer").getString();
+		int timer = node.getNode("timer").getInt();
 		ConfigurationNode prize = node.getNode("prize");
 		ConfigurationNode malus = node.getNode("malus");
 		
 		if(qType == Types.SIMPLE) 
 			return new Question(question, prize == null ? Optional.empty() : Optional.of(prize), answer,
-					malus == null ? Optional.empty() : Optional.of(malus));
+					malus == null ? Optional.empty() : Optional.of(malus), timer);
 		else if(qType == Types.MULTI) {
 			if(StringUtils.isNumeric(answer) && Integer.valueOf(answer) <= 4 && Integer.valueOf(answer) > 0) {
 				byte answerNumber = Byte.valueOf(answer);
@@ -47,7 +48,7 @@ public class QuestionSerializer implements TypeSerializer<Question>{
 				return new QuestionMulti(question, prize == null ? Optional.empty() : Optional.of(prize),
 						new String[] {propositionOne, propositionTwo == null ? "" : propositionTwo.getString(),
 								 propositionThree == null ? "" : propositionThree.getString(),
-								 propositionFour == null ? "" : propositionFour.getString()}, answerNumber, Optional.of(malus));
+								 propositionFour == null ? "" : propositionFour.getString()}, answerNumber, Optional.of(malus), timer);
 			}
 		}
 		QuestionsTime.getInstance().getLogger().error("This never should happen, but she happened, so... just report the error with the more information you have");
@@ -58,6 +59,7 @@ public class QuestionSerializer implements TypeSerializer<Question>{
 	public void serialize(TypeToken<?> type, Question q, ConfigurationNode node) throws ObjectMappingException {
 		node.getNode("question").setValue(q.getQuestion());
 		node.getNode("answer").setValue(q.getAnswer());
+		node.getNode("timer").setValue(q.getTimer());
 		if(q instanceof QuestionMulti) {
 			QuestionMulti qMulti = (QuestionMulti) q;
 			node.getNode("proposition1").setValue(qMulti.getPropositions()[0]);

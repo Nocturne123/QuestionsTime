@@ -12,14 +12,14 @@ public class QuestionMulti extends Question {
 	private byte answer;
 	
 	public QuestionMulti(String question, Optional<ConfigurationNode> prizeNode, String[] propositions, byte answer, 
-			Optional<ConfigurationNode> malusNode) {
-		super(question, prizeNode, String.valueOf(answer), malusNode);
+			Optional<ConfigurationNode> malusNode, int timer) {
+		super(question, prizeNode, String.valueOf(answer), malusNode, timer);
 		this.propositions = propositions;
 		this.answer = answer;
 	}
 	
-	public QuestionMulti(String question, Prize prize, String[] propositions, byte answer, Malus malus) {
-		super(question, prize, String.valueOf(answer), malus);
+	public QuestionMulti(String question, Prize prize, String[] propositions, byte answer, Malus malus, int timer) {
+		super(question, prize, String.valueOf(answer), malus, timer);
 		this.propositions = propositions;
 		this.answer = answer;
 	}

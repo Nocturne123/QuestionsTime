@@ -1,6 +1,7 @@
 package fr.nocturne123.questionstime;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Optional;
@@ -15,7 +16,7 @@ import org.spongepowered.api.Platform.Component;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.source.ConsoleSource;
 import org.spongepowered.api.command.spec.CommandSpec;
-import org.spongepowered.api.config.DefaultConfig;
+import org.spongepowered.api.config.ConfigDir;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.state.GameInitializationEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
@@ -31,12 +32,16 @@ import org.spongepowered.api.text.format.TextColors;
 import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
 
+import fr.nocturne123.questionstime.handler.ConfigHandler;
+import fr.nocturne123.questionstime.handler.EventHandler;
+import fr.nocturne123.questionstime.handler.MessageHandler;
 import fr.nocturne123.questionstime.question.Question;
 import fr.nocturne123.questionstime.question.QuestionCreator;
 import fr.nocturne123.questionstime.question.QuestionSerializer;
+import fr.nocturne123.questionstime.util.TextUtils;
 import ninja.leaping.configurate.objectmapping.serialize.TypeSerializers;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.0", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.1", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
@@ -48,8 +53,8 @@ public class QuestionsTime {
 	private Game game;
 	
 	@Inject
-	@DefaultConfig(sharedRoot = false)
-	private File file;
+	@ConfigDir(sharedRoot = false)
+	private Path path;
 	
 	@Inject
 	private PluginContainer container;
@@ -62,6 +67,8 @@ public class QuestionsTime {
 	private Optional<Question> currentQuestion;
 	private Optional<EconomyService> economy;
 	private ArrayList<QuestionCreator> questionCreator;
+	private long timedQuestionStarted;
+	private Task taskTimer;
 
 	@SuppressWarnings("static-access")
 	@Listener
@@ -72,10 +79,14 @@ public class QuestionsTime {
 		this.getConsole().sendMessage(TextUtils.Console.creatorNormalWithPrefix("╚───────────────────╝"));
 		TypeSerializers.getDefaultSerializers().registerType(TypeToken.of(Question.class), new QuestionSerializer());
 		this.questions = new ArrayList<>();
-		if(file != null)
-			ConfigHandler.init(file);
+		if(path != null)
+			ConfigHandler.init(new File(path.toString() + "/questionstime.conf"));
 		else
 			this.logger.warn("The file instance which is essential to access the config file was null. This shouldn't never happen. Try to restart the server ?");
+		if(path != null)
+			MessageHandler.init(new File(path.toString() + "/message.conf"));
+		else
+			this.logger.warn("The file instance which is essential to access the message file was null. This shouldn't never happen. Try to restart the server ?");
 		this.currentQuestion = Optional.empty();
 		this.questionCreator = new ArrayList<>();
 		this.economy = Sponge.getServiceManager().provide(EconomyService.class);
@@ -220,5 +231,18 @@ public class QuestionsTime {
 	public ConsoleSource getConsole() {
 		return Sponge.getGame().getServer().getConsole();
 	}
+		
+	public void startTimer(Task task) {
+		this.timedQuestionStarted = System.currentTimeMillis();
+		this.taskTimer = task;
+	}
 	
+	public long getTimerStarted() {
+		return System.currentTimeMillis() - this.timedQuestionStarted;
+	}
+	
+	public void stopTimer() {
+		this.taskTimer.cancel();
+		this.timedQuestionStarted = 0;
+	}
 }

@@ -3,16 +3,17 @@ package fr.nocturne123.questionstime.question;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import org.apache.commons.lang3.StringUtils;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 
-import fr.nocturne123.questionstime.ConfigHandler;
 import fr.nocturne123.questionstime.Malus;
 import fr.nocturne123.questionstime.Prize;
 import fr.nocturne123.questionstime.QuestionsTime;
-import fr.nocturne123.questionstime.TextUtils;
+import fr.nocturne123.questionstime.handler.ConfigHandler;
 import fr.nocturne123.questionstime.question.Question.Types;
+import fr.nocturne123.questionstime.util.TextUtils;
 
 public class QuestionCreator {
 
@@ -25,6 +26,7 @@ public class QuestionCreator {
 	private boolean announcePrize, announceMalus;
 	private int moneyPrize, moneyMalus;
 	private ArrayList<ItemStack> itemsPrize;
+	private int timer;
 	
 	public QuestionCreator(UUID uuid) {
 		this.creator = uuid;
@@ -107,9 +109,19 @@ public class QuestionCreator {
 				this.moneyMalus = Integer.valueOf(previousResponse);
 			break;
 		case 14:
-			if(previousResponse.equals("yes"))
+			if(previousResponse.equals("no"))
+				this.currentStep++;
+			break;
+		case 15:
+			String timeHour = StringUtils.substringBefore(previousResponse, "h");
+			String timeMinute = StringUtils.substringBetween(previousResponse, "h", "m");
+			String timeSecond = StringUtils.substringBetween(previousResponse, "m", "s");
+			timer = (Integer.valueOf(timeHour) * 3600) + (Integer.valueOf(timeMinute) * 60) + Integer.valueOf(timeSecond);
+			break;
+		case 16:
+			if(previousResponse.equals("start"))
 				this.finish(true);
-			else if(previousResponse.equals("no"))
+			else if(previousResponse.equals("save"))
 				this.finish(false);
 			Sponge.getServer().getPlayer(creator).get().sendMessage(TextUtils.creatorNormalWithPrefix("OK, you leaving the Question Creator"));
 			QuestionsTime.getInstance().removeCreator(this.creator);
@@ -128,12 +140,12 @@ public class QuestionCreator {
 		Prize prize = new Prize(this.moneyPrize, this.announcePrize, items);
 		Malus malus = new Malus(this.moneyMalus, this.announceMalus);
 		if(this.questionType == Types.MULTI) {
-			QuestionMulti multiQ = new QuestionMulti(question, prize, propositions, Byte.valueOf(answer), malus);
+			QuestionMulti multiQ = new QuestionMulti(question, prize, propositions, Byte.valueOf(answer), malus, timer);
 			if(ask)
 				QuestionsTime.getInstance().addQuestion(multiQ);
 			ConfigHandler.serializeQuestion(multiQ);
 		} else {
-			Question q = new Question(question, prize, answer, malus);
+			Question q = new Question(question, prize, answer, malus, timer);
 			if(ask)
 				QuestionsTime.getInstance().addQuestion(q);
 			ConfigHandler.serializeQuestion(q);

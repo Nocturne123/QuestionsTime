@@ -10,6 +10,8 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
 
+import fr.nocturne123.questionstime.util.TextUtils;
+
 public class CommandCreateQuestion implements CommandExecutor {
 
 	@Override

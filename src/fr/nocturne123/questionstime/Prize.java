@@ -6,12 +6,14 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.spongepowered.api.CatalogType;
 import org.spongepowered.api.Sponge;
+import org.spongepowered.api.command.source.ConsoleSource;
 import org.spongepowered.api.data.DataQuery;
 import org.spongepowered.api.data.key.Key;
 import org.spongepowered.api.item.ItemType;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 
+import fr.nocturne123.questionstime.util.TextUtils;
 import ninja.leaping.configurate.ConfigurationNode;
  
 public class Prize {
@@ -26,6 +28,7 @@ public class Prize {
 			ConfigurationNode prize = prizeNode.get();
 			this.money = prize.getNode("money") != null ? prize.getNode("money").getInt() : 0;
 			this.announce = prize.getNode("announce") != null ? prize.getNode("announce").getBoolean() : true;
+			ConsoleSource console = QuestionsTime.getInstance().getConsole();
 			
 			ConfigurationNode items = prize.getNode("items");
 			if(items.getValue() != null) {
@@ -44,27 +47,27 @@ public class Prize {
 							if(itemID[1].contains(";"))
 								itemID[1] = itemID[1].split(";")[0];
 							if(itemID.length > 2)
-								QuestionsTime.getInstance().getLogger().warn("An item's id contains two or more \":\" (\""+preItem+"\")");
+								console.sendMessage(TextUtils.Console.creatorError("  An item's id contains two or more \":\" (\""+preItem+"\")"));
 							else if(itemID.length < 2)
-								QuestionsTime.getInstance().getLogger().warn("An item's id contains only the mod's id or the name's item."
-										+ " Delete the \":\" or add the mod's id / name's item (\""+preItem+"\")");
+								console.sendMessage(TextUtils.Console.creatorError("  An item's id contains only the mod's id or the name's item."
+										+ " Delete the \":\" or add the mod's id / name's item (\""+preItem+"\")"));
 							else {
 								it = Sponge.getRegistry().getType(ItemType.class, (itemID[0]+":"+itemID[1])).orElse(ItemTypes.NONE);
 								if(!itemID[1].equals("NONE") && it.getType().equals(ItemTypes.NONE))
-									QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID[1]+"\") doesn't exist");
+									console.sendMessage(TextUtils.Console.creatorError("  The item's id (\""+itemID[1]+"\") doesn't exist"));
 							}
 						} else {
 							String itemID = preItem.contains(";") ? itemSplit[0] : preItem;
 							it = Sponge.getRegistry().getType(ItemType.class, ("minecraft:"+itemID)).orElse(ItemTypes.NONE);
 							if(!itemID.equals("NONE") && it.getType().equals(ItemTypes.NONE))
-								QuestionsTime.getInstance().getLogger().warn("The item's id (\""+itemID+"\") doesn't exist");
+								console.sendMessage(TextUtils.Console.creatorError("  The item's id (\""+itemID+"\") doesn't exist"));
 						}
 						if(itemSplit.length >= 2) {
 							if(StringUtils.isNumeric(itemSplit[1])) {
 								if(Integer.valueOf(itemSplit[1]) >= 0)
 									damage = Integer.valueOf(itemSplit[1]);
 								else
-									QuestionsTime.getInstance().getLogger().warn("The items's damage is negative (\""+preItem+"\" -> \""+itemSplit[1]+"\")");
+									console.sendMessage(TextUtils.Console.creatorError("  The items's damage is negative (\""+preItem+"\" -> \""+itemSplit[1]+"\")"));
 							} else
 								variant = itemSplit[1];
 						}
@@ -73,9 +76,9 @@ public class Prize {
 								if(Integer.valueOf(itemSplit[2]) >= 0)
 									count = Integer.valueOf(itemSplit[2]);
 								else
-									QuestionsTime.getInstance().getLogger().warn("The items's count is negative (\""+preItem+"\" -> \""+itemSplit[2]+"\")");
+									console.sendMessage(TextUtils.Console.creatorError("  The items's count is negative (\""+preItem+"\" -> \""+itemSplit[2]+"\")"));
 							} else
-								QuestionsTime.getInstance().getLogger().warn("The item's count isn't an number (\""+preItem+"\" -> \""+itemSplit[2]+"\")");
+								console.sendMessage(TextUtils.Console.creatorError("  The item's count isn't an number (\""+preItem+"\" -> \""+itemSplit[2]+"\")"));
 						}
 						
 						ItemStack is = ItemStack.builder().itemType(it).quantity(count).build();
@@ -100,21 +103,21 @@ public class Prize {
 													is.offer(key, element);
 													break searchVariant;
 												} else
-													QuestionsTime.getInstance().getLogger().info("The variant \""+variant+"\" isn't applicable for the item \""
-															+is.getItem().getId()+"\" {\""+preItem+"\" -> \""+itemSplit[1]+"\"}");
+													console.sendMessage(TextUtils.Console.creatorError("  The variant \""+variant+"\" isn't applicable for the item \""
+															+is.getItem().getId()+"\" {\""+preItem+"\" -> \""+itemSplit[1]+"\"}"));
 											}
 										}
 									}
 								}
 							}
 							if(!variantExist)
-								QuestionsTime.getInstance().getLogger().error("No variant named \""+variant+"\" has been found {\""+preItem+"\" -> \""+itemSplit[1]+"\")");
+								console.sendMessage(TextUtils.Console.creatorError("  No variant named \""+variant+"\" has been found {\""+preItem+"\" -> \""+itemSplit[1]+"\")"));
 							}
 						} else if(damage > 0)
 							is = ItemStack.builder().fromContainer(is.toContainer().set(DataQuery.of("UnsafeDamage"), damage)).build();
 						isList.add(is);
 					} catch (Exception e) {
-						QuestionsTime.getInstance().getLogger().error("Error when loading an item {\""+preItem+"\"}");
+						console.sendMessage(TextUtils.Console.creatorError("  Error when loading an item {\""+preItem+"\"}"));
 						e.printStackTrace();
 					}
 				});
