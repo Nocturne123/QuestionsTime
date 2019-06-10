@@ -2,6 +2,13 @@ package fr.nocturne123.questionstime.handler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.reflect.TypeToken;
+import java.io.File;
+
+import org.spongepowered.api.asset.Asset;
+
+import com.google.common.base.Preconditions;
+import com.google.common.reflect.TypeToken;
+
 import fr.nocturne123.questionstime.QuestionsTime;
 import fr.nocturne123.questionstime.question.Question;
 import fr.nocturne123.questionstime.util.TextUtils;
@@ -25,7 +32,7 @@ public class ConfigHandler {
 	private static CommentedConfigurationNode configNode;
 	private static final QuestionsTime main = QuestionsTime.getInstance();
 	private static final ConsoleSource console = QuestionsTime.getInstance().getConsole();
-	
+
 	private static int cooldown;
 	private static boolean isRandom;
 	private static int minCooldown;
@@ -72,7 +79,7 @@ public class ConfigHandler {
 			loadQuestions(questions);
 			configLoader.save(configNode);
 		} catch (Exception e) {
-			console.sendMessage(TextUtils.Console.creatorError("Error during loading the config file !"));
+			QuestionsTime.getInstance().getConsole().sendMessage(TextUtils.Console.creatorError("Error during loading the config file !"));
 			e.printStackTrace();
 		}
 	}
@@ -122,7 +129,7 @@ public class ConfigHandler {
 	public static boolean isPersonalAnswer() {
 		return personalAnswer;
 	}
-	
+
 	public static int getMinConnected() {
 		return minConnected;
 	}

@@ -47,7 +47,6 @@ public class Prize {
 						String variant = "";
 						String customName = "";
 						ArrayList<Text> lore = Lists.newArrayList();
-						
 						if((itemSplit.length >= 1 && itemSplit[0].contains(":")) || (!preItem.contains(";") && preItem.contains(":"))) {
 							String[] itemID = preItem.split(":");
 							if(itemID[1].contains(";"))
@@ -110,7 +109,6 @@ public class Prize {
 								.quantity(count)
 								.add(Keys.DISPLAY_NAME, Text.of(customName))
 								.add(Keys.ITEM_LORE, lore).build();
-						
 						boolean variantExist = false;
 						if(!variant.isEmpty() && QuestionsTime.getInstance().getSpongeAPI() == 7) {
 							searchVariant: {

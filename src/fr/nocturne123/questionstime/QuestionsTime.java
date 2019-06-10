@@ -34,7 +34,6 @@ import org.spongepowered.api.text.format.TextColors;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -190,15 +189,6 @@ public class QuestionsTime {
 	
 	public void removeCreator(UUID uuid) {
 		this.questionCreator.removeIf(qc -> qc.getCreator().equals(uuid));
-
-		/*Iterator<QuestionCreator> iter = this.questionCreator.iterator();
-		while(iter.hasNext()) {
-			QuestionCreator qc = iter.next();
-			if(qc.getCreator().equals(uuid)) {
-				iter.remove();
-				break;
-			}
-		}*/
 	}
 	
 	public boolean isCreator(UUID uuid) {

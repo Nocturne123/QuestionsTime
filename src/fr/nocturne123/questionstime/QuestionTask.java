@@ -51,7 +51,7 @@ public class QuestionTask implements Runnable {
 							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("question.proposition", "position:"+(i+1), "proposition:"+qMulti.getPropositions()[i])));
 					}
 					if(prize.isAnnounce() && 
-							((prize.getTypes().length > 0 && !prize.getTypes()[0].getType().equals(ItemTypes.NONE)) || 
+							((prize.getTypes().length > 0 && !prize.getTypes()[0].getType().equals(ItemTypes.NONE)) ||
 									(prize.getMoney() >= 0 && instance.getEconomy().isPresent()))) {
 						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("prize.announce")));
 						if(prize.getMoney() > 0 && QuestionsTime.getInstance().getEconomy().isPresent())
