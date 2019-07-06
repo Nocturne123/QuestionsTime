@@ -8,6 +8,10 @@ import fr.nocturne123.questionstime.handler.MessageHandler;
 import fr.nocturne123.questionstime.question.Question;
 import fr.nocturne123.questionstime.question.QuestionCreator;
 import fr.nocturne123.questionstime.question.QuestionSerializer;
+import fr.nocturne123.questionstime.question.component.Malus;
+import fr.nocturne123.questionstime.question.component.MalusSerializer;
+import fr.nocturne123.questionstime.question.component.Prize;
+import fr.nocturne123.questionstime.question.component.PrizeSerializer;
 import fr.nocturne123.questionstime.util.TextUtils;
 import ninja.leaping.configurate.objectmapping.serialize.TypeSerializers;
 import org.apache.commons.lang3.CharUtils;
@@ -37,7 +41,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.2", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.3", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
@@ -58,10 +62,10 @@ public class QuestionsTime {
 	private ArrayList<Question> questions;
 	public final Text qtPrefix = Text.builder("[").color(TextColors.AQUA)
 			.append(Text.builder("QT").color(TextColors.YELLOW)
-			.append(Text.builder("]").color(TextColors.AQUA)
+			.append(Text.builder("] ").color(TextColors.AQUA)
 			.build()).build()).build();
-	private Optional<Question> currentQuestion;
-	private Optional<EconomyService> economy;
+	private Question currentQuestion;
+	private EconomyService economy;
 	private ArrayList<QuestionCreator> questionCreator;
 	private long timedQuestionStarted;
 	private Task taskTimer;
@@ -72,15 +76,16 @@ public class QuestionsTime {
 		this.instance = this;
 		this.getConsole().sendMessage(TextUtils.Console.creatorNormalWithPrefix("~~~QUESTIONSTIME~~~"));
 		TypeSerializers.getDefaultSerializers().registerType(TypeToken.of(Question.class), new QuestionSerializer());
+		TypeSerializers.getDefaultSerializers().registerType(TypeToken.of(Prize.class), new PrizeSerializer());
+		TypeSerializers.getDefaultSerializers().registerType(TypeToken.of(Malus.class), new MalusSerializer());
 		this.questions = new ArrayList<>();
 		if(path != null) {
 			ConfigHandler.init(path/*new File(path.toString() + "/questionstime.conf")*/);
 			MessageHandler.init(path/*new File(path.toString() + "/message.conf")*/);
 		} else
 			this.logger.warn("The file instance which is essential to access the config file was null. This shouldn't never happen. Try to restart the server ?");
-		this.currentQuestion = Optional.empty();
 		this.questionCreator = new ArrayList<>();
-		this.economy = Sponge.getServiceManager().provide(EconomyService.class);
+		Sponge.getServiceManager().provide(EconomyService.class).ifPresent(economyService -> economy = economyService);
 		Sponge.getEventManager().registerListeners(this, new EventHandler());
 	
 		CommandSpec commandQTCreate = CommandSpec.builder()
@@ -103,7 +108,7 @@ public class QuestionsTime {
 			this.getConsole().sendMessage(TextUtils.Console.creatorComposed("Loaded ", ""+this.questions.size(), " question(s) !"));
 			this.sayNewQuestion();
 		} else
-			this.getConsole().sendMessage(TextUtils.Console.creatorError("No questions were register. Do you add questions ?"));
+			this.getConsole().sendMessage(TextUtils.Console.creatorError(" No questions were register. Do you add questions ?"));
 	}
 
 	@Listener
@@ -114,7 +119,7 @@ public class QuestionsTime {
 	@Listener
 	public void onServerProviderChange(ChangeServiceProviderEvent e) {
 		if(e.getService().equals(EconomyService.class))
-			this.economy = Optional.of((EconomyService) e.getNewProviderRegistration().getProvider());
+			this.economy = (EconomyService) e.getNewProviderRegistration().getProvider();
 	}
 	
 	public void sayNewQuestion() {
@@ -168,10 +173,10 @@ public class QuestionsTime {
 	}
 	
 	public Optional<Question> getCurrentQuestion() {
-		return this.currentQuestion;
+		return Optional.ofNullable(this.currentQuestion);
 	}
 	
-	public void setPlayedQuestion(Optional<Question> currentQuestion) {
+	public void setPlayedQuestion(Question currentQuestion) {
 		this.currentQuestion = currentQuestion;
 	}
 	
@@ -180,7 +185,7 @@ public class QuestionsTime {
 	}
 	
 	public Optional<EconomyService> getEconomy() {
-		return economy;
+		return Optional.ofNullable(economy);
 	}
 
 	public void addCreator(UUID uuid) {
@@ -226,7 +231,8 @@ public class QuestionsTime {
 	}
 	
 	public void stopTimer() {
-		this.taskTimer.cancel();
+		if(this.taskTimer != null)
+			this.taskTimer.cancel();
 		this.timedQuestionStarted = 0;
 	}
 }

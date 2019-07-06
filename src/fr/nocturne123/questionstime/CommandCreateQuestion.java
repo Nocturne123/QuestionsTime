@@ -1,5 +1,6 @@
 package fr.nocturne123.questionstime;
 
+import fr.nocturne123.questionstime.util.TextUtils;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.CommandSource;
@@ -9,8 +10,6 @@ import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.text.format.TextStyles;
-
-import fr.nocturne123.questionstime.util.TextUtils;
 
 public class CommandCreateQuestion implements CommandExecutor {
 

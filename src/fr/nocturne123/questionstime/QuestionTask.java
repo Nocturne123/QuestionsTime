@@ -1,22 +1,25 @@
 package fr.nocturne123.questionstime;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-
+import fr.nocturne123.questionstime.handler.ConfigHandler;
+import fr.nocturne123.questionstime.handler.MessageHandler;
+import fr.nocturne123.questionstime.message.Message;
+import fr.nocturne123.questionstime.message.MessageComponents;
+import fr.nocturne123.questionstime.question.Question;
+import fr.nocturne123.questionstime.question.Question.Types;
+import fr.nocturne123.questionstime.question.QuestionMulti;
+import fr.nocturne123.questionstime.question.component.Malus;
+import fr.nocturne123.questionstime.question.component.Prize;
+import fr.nocturne123.questionstime.util.TextUtils;
 import org.spongepowered.api.Sponge;
-import org.spongepowered.api.data.DataQuery;
-import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.text.Text;
 
-import fr.nocturne123.questionstime.handler.ConfigHandler;
-import fr.nocturne123.questionstime.handler.MessageHandler;
-import fr.nocturne123.questionstime.question.Question;
-import fr.nocturne123.questionstime.question.Question.Types;
-import fr.nocturne123.questionstime.question.QuestionMulti;
-import fr.nocturne123.questionstime.util.TextUtils;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 public class QuestionTask implements Runnable {
 
@@ -30,56 +33,73 @@ public class QuestionTask implements Runnable {
 	public void run() {
 		if(instance.getGame().getServer().getOnlinePlayers().size() >= ConfigHandler.getMinConnected()) {
 			Random rand = new Random();
-			ArrayList<Question> qs = instance.getQuestions();
-			Question q = qs.get(rand.nextInt(qs.size()));
-			Prize prize = q.getPrize();
-			Malus malus = q.getMalus();
+			ArrayList<Question> questions = instance.getQuestions();
+			Question question = questions.get(rand.nextInt(questions.size()));
+			Optional<Prize> prizeOptional = question.getPrize();
+			Optional<Malus> malusOptional = question.getMalus();
 			instance.getGame().getServer().getOnlinePlayers().forEach(player -> {
 				if(!instance.isCreator(player.getUniqueId()))
-					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("question.new")));
+					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.QUESTION_NEW)));
 			});
 			
 			Task.builder().execute(task -> {
 				instance.getGame().getServer().getOnlinePlayers().forEach(player -> {
 					if(instance.isCreator(player.getUniqueId()))
 						return;
-					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("question.ask", "question:"+q.getQuestion())));
+					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_ASK)
+							.setComponent(MessageComponents.QUESTION, question.getQuestion()).build())));
 					
-					if(q.getType() == Types.MULTI) {
-						QuestionMulti qMulti = (QuestionMulti) q;
-						for(int i = 0; i < qMulti.getPropositions().length; i++)
-							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("question.proposition", "position:"+(i+1), "proposition:"+qMulti.getPropositions()[i])));
+					if(question.getType() == Types.MULTI) {
+						QuestionMulti qMulti = (QuestionMulti) question;
+						for(int i = 0; i < qMulti.getPropositions().size(); i++)
+							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_PROPOSITION)
+									.setComponent(MessageComponents.POSITION, (byte) (i+1))
+									.setComponent(MessageComponents.PROPOSITION, qMulti.getPropositions().get(i))
+									.build())));
 					}
-					if(prize.isAnnounce() && 
-							((prize.getTypes().length > 0 && !prize.getTypes()[0].getType().equals(ItemTypes.NONE)) ||
-									(prize.getMoney() >= 0 && instance.getEconomy().isPresent()))) {
-						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("prize.announce")));
-						if(prize.getMoney() > 0 && QuestionsTime.getInstance().getEconomy().isPresent())
-							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("prize.money", "money:"+prize.getMoney(), "currency:"+
-									instance.getEconomy().get().getDefaultCurrency().getDisplayName().toPlain())));
-						
-						for(int i = 0; i < prize.getTypes().length; i++) {
-							ItemStack is = prize.getTypes()[i];
-							if(!is.getType().equals(ItemTypes.NONE))
-								player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("prize.item", "quantity:"+is.getQuantity(),
-										"modid:"+is.getType().getId().split(":")[0], "item:"+is.getType().getId().split(":")[1], "metadata:"+is.toContainer().getValues(true)
-										.get(DataQuery.of("UnsafeDamage")), "customname:"+is.get(Keys.DISPLAY_NAME).orElse(Text.of("null")),
-										"lore:"+is.get(Keys.ITEM_LORE).orElse(Collections.singletonList(Text.of("null"))))));
+
+					prizeOptional.ifPresent(prize -> {
+						if(prize.isAnnounce() &&
+								((prize.getItemStacks().length > 0 && !prize.getItemStacks()[0].getType().equals(ItemTypes.NONE)) ||
+										(prize.getMoney() >= 0 && instance.getEconomy().isPresent()))) {
+							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.PRIZE_ANNOUNCE)));
+							if(prize.getMoney() > 0 && QuestionsTime.getInstance().getEconomy().isPresent())
+								player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.PRIZE_MONEY)
+										.setComponent(MessageComponents.MONEY, prize.getMoney())
+										.setComponent(MessageComponents.CURRENCY, instance.getEconomy().get()).build())));
+
+							for(int i = 0; i < prize.getItemStacks().length; i++) {
+								ItemStack is = prize.getItemStacks()[i];
+								if(!is.getType().equals(ItemTypes.NONE))
+									player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.PRIZE_ITEM)
+											.setComponent(MessageComponents.QUANTITY, is.getQuantity())
+											.setComponent(MessageComponents.MOD_ID, is)
+											.setComponent(MessageComponents.ITEM, is)
+											.setComponent(MessageComponents.METADATA, is)
+											.build())));
+							}
 						}
-					}
-					if(malus.isAnnounce() && malus.getMoney() > 0 && instance.getEconomy().isPresent()) {
-						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("malus.announce")));
-						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("malus.money", "money:"+malus.getMoney(),
-								"currency:"+instance.getEconomy().get().getDefaultCurrency().getDisplayName().toPlain())));
-					}
-					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("answer.announce")));
-					if(q.isTimed()) {
-						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("question.end.timer", "timer:"+q.getTimer())));
-						this.startTimer(q.getTimer());
+					});
+
+					malusOptional.ifPresent(malus -> {
+						if(malus.isAnnounce() && malus.getMoney() > 0 && instance.getEconomy().isPresent()) {
+							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.MALUS_ANNOUNCE)));
+							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.MALUS_MONEY)
+									.setComponent(MessageComponents.MONEY, malus.getMoney())
+									.setComponent(MessageComponents.CURRENCY, instance.getEconomy().get()
+									).build())));
+						}
+					});
+
+					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.ANSWER_ANNOUNCE)));
+					if(question.isTimed()) {
+						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_TIMER_END)
+								.setComponent(MessageComponents.TIMER, question.getTimer()).build())));
+						this.startTimer(question.getTimer());
 					} else
-						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get("question.end")));
+						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.QUESTION_END)));
 				});
-				instance.setPlayedQuestion(Optional.of(q));
+				instance.setPlayedQuestion(question);
 			})
 			.async()
 			.delay(3, TimeUnit.SECONDS)
@@ -96,13 +116,14 @@ public class QuestionTask implements Runnable {
 			long secondStarted = instance.getTimerStarted() / 1000;
 			int timeLeft = (int) (timerTicks - secondStarted);
 			if(timeLeft == 0) {
-				TextUtils.sendTextToEveryone(MessageHandler.get("question.timer.out"));
-				instance.setPlayedQuestion(Optional.empty());
+				TextUtils.sendTextToEveryone(MessageHandler.get(MessageHandler.Messages.QUESTION_TIMER_OUT));
+				instance.setPlayedQuestion(null);
 				instance.stopTimer();
 				instance.sayNewQuestion();
 			} else if(timeLeft % 3600 == 0 || timeLeft == 1800 || timeLeft == 900 || timeLeft == 300 || timeLeft == 60 || timeLeft == 30 || timeLeft == 15 
 					|| timeLeft == 5 || timeLeft == 4 || timeLeft == 3 || timeLeft == 2 || timeLeft == 1)
-				TextUtils.sendTextToEveryone(MessageHandler.get("question.timer.left", "timer:"+timeLeft));
+				TextUtils.sendTextToEveryone(MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_TIMER_LEFT)
+						.setComponent(MessageComponents.TIMER, timeLeft).build()));
 		})
 		.async()
 		.name("[QT]QuestionTimer")

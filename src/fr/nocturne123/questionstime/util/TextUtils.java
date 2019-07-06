@@ -1,8 +1,10 @@
 package fr.nocturne123.questionstime.util;
 
 import fr.nocturne123.questionstime.QuestionsTime;
+import org.apache.commons.lang3.StringUtils;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.data.DataQuery;
+import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
@@ -49,33 +51,39 @@ public class TextUtils {
 		String itemID = is.getType().getId();
 		if(itemID.isEmpty())
 			return Text.of("itemIDEmpty");
-		String finalID = "";
+		Text finalID = Text.EMPTY;
 		Text textModID = Text.builder("").build();
-		if(itemID.startsWith("minecraft:")) {
-			finalID = itemID.substring(10);
-			finalID = finalID.substring(0, 1).toUpperCase()+finalID.substring(1, finalID.length());
-		} else if(itemID.contains(":") && !itemID.split(":")[0].isEmpty()) {
-			String modID = itemID.split(":")[0];
-			Optional<PluginContainer> pluginCont = Sponge.getPluginManager().getPlugin(modID);
-			if(pluginCont.isPresent()) {
-				String modName = pluginCont.get().getName();
-				String itemName = itemID.split(":")[1];
-				textModID = Text.builder(modName.substring(0, 1).toUpperCase()+modName.substring(1, modName.length())+": ").color(TextColors.BLUE).build();
-				finalID = itemName.substring(0, 1).toUpperCase()+itemName.substring(1, itemName.length());
-			} else {
-				instance.getLogger().error("No mod with ID \""+modID+"\" was found.");
-				finalID = modID+" - "+itemID+" -> No found";
-			}
-		} else
-			finalID = "error{"+itemID+"}";
-		if(finalID.contains("_"))
-			finalID = finalID.replace('_', ' ');
+		if(is.get(Keys.DISPLAY_NAME).isPresent()) {
+			Text displayName = is.get(Keys.DISPLAY_NAME).get();
+			if(!displayName.isEmpty())
+				finalID = Text.of(displayName);
+		}
+		if(finalID.isEmpty()) {
+			if (itemID.startsWith("minecraft:"))
+				finalID = Text.of(StringUtils.capitalize(itemID.substring(10)));
+			else if (itemID.contains(":") && !itemID.split(":")[0].isEmpty()) {
+				String modID = itemID.split(":")[0];
+				Optional<PluginContainer> pluginCont = Sponge.getPluginManager().getPlugin(modID);
+				if (pluginCont.isPresent()) {
+					String modName = pluginCont.get().getName();
+					String itemName = itemID.split(":")[1];
+					textModID = Text.builder(modName.substring(0, 1).toUpperCase() + modName.substring(1) + ": ").color(TextColors.BLUE).build();
+					finalID = Text.of(StringUtils.capitalize(itemName));
+				} else {
+					instance.getLogger().error("No mod with ID \"" + modID + "\" was found.");
+					finalID = Text.of(modID + " - " + itemID + " -> No found");
+				}
+			} else
+				finalID = Text.of("error{" + itemID + "}");
+		}
+		if(finalID.toPlain().contains("_"))
+			finalID = Text.of(finalID.toPlain().replace('_', ' '));
 		Map<DataQuery, Object> keys = is.toContainer().getValues(true);
 		Text metadataText = Text.builder().build();
 		if(keys.containsKey(DataQuery.of("UnsafeDamage")) && keys.get(DataQuery.of("UnsafeDamage")) instanceof Integer)
 			if(((int) keys.get(DataQuery.of("UnsafeDamage"))) != 0)
 				metadataText = Text.builder(" "+keys.get(DataQuery.of("UnsafeDamage"))).color(TextColors.AQUA).build();
-		return Text.join(textModID, Text.builder(finalID).color(TextColors.WHITE).build(), metadataText);
+		return Text.join(textModID, Text.builder().append(finalID).color(TextColors.WHITE).build(), metadataText);
 	}
 
 	public static class Console {

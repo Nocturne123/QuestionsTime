@@ -2,13 +2,6 @@ package fr.nocturne123.questionstime.handler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.reflect.TypeToken;
-import java.io.File;
-
-import org.spongepowered.api.asset.Asset;
-
-import com.google.common.base.Preconditions;
-import com.google.common.reflect.TypeToken;
-
 import fr.nocturne123.questionstime.QuestionsTime;
 import fr.nocturne123.questionstime.question.Question;
 import fr.nocturne123.questionstime.util.TextUtils;
