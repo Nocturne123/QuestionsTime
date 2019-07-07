@@ -92,13 +92,13 @@ public class QuestionTask implements Runnable {
 					});
 
 					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.ANSWER_ANNOUNCE)));
-					if(question.isTimed()) {
+					if(question.isTimed())
 						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_TIMER_END)
 								.setComponent(MessageComponents.TIMER, question.getTimer()).build())));
-						this.startTimer(question.getTimer());
-					} else
+					else
 						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.QUESTION_END)));
 				});
+				if(question.isTimed()) this.startTimer(question.getTimer());
 				instance.setPlayedQuestion(question);
 			})
 			.async()

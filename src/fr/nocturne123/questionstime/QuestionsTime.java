@@ -41,7 +41,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.3", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.4", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
