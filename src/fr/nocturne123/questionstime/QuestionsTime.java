@@ -41,7 +41,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.4", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.5", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
@@ -132,7 +132,7 @@ public class QuestionsTime {
 	}
 	
 	private void startFixTimeQuestion() {
-		Task.builder().execute(new QuestionTask(false, this))
+		Task.builder().execute(new QuestionTask(this))
 		.async()
 		.delayTicks(ConfigHandler.getCooldown())
 		.name("[QT]FixTimeQuestion")
@@ -141,7 +141,7 @@ public class QuestionsTime {
 	
 	private void startIntervalQuestion() {
 		Task.builder().execute(task -> {
-			Task.builder().execute(new QuestionTask(true, this))
+			Task.builder().execute(new QuestionTask(this))
 			.async()
 			.delayTicks(RandomUtils.nextInt(1, ConfigHandler.getMaxCooldown() - ConfigHandler.getMinCooldown()))
 			.name("[QT]SecondIntervalQuestion")

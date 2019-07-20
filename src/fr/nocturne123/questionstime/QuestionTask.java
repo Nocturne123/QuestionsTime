@@ -25,7 +25,7 @@ public class QuestionTask implements Runnable {
 
 	private QuestionsTime instance;
 	
-	public QuestionTask(boolean isInterval, QuestionsTime instance) {
+	public QuestionTask(QuestionsTime instance) {
 		this.instance = instance;
 	}
 	
@@ -127,6 +127,7 @@ public class QuestionTask implements Runnable {
 		})
 		.async()
 		.name("[QT]QuestionTimer")
+		.delay(1, TimeUnit.SECONDS)
 		.interval(1, TimeUnit.SECONDS)
 		.submit(instance);
 		instance.startTimer(task);
