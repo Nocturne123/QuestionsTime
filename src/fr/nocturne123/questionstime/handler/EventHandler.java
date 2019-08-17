@@ -11,6 +11,7 @@ import fr.nocturne123.questionstime.question.component.Prize;
 import fr.nocturne123.questionstime.question.component.PrizeSerializer;
 import fr.nocturne123.questionstime.util.TextUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
@@ -33,6 +34,7 @@ import java.util.regex.Pattern;
 public class EventHandler {
 
     private Map<UUID, Long> playerCooldownAnswer = new HashMap<>();
+    private static final Logger logger = QuestionsTime.getInstance().getLogger();
 
     @Listener
     public void onReceiveMessage(MessageChannelEvent event) {
@@ -54,8 +56,15 @@ public class EventHandler {
 
     private void handleQuestionAnswer(String message, Player sender, QuestionsTime instance, MessageChannelEvent event) {
         Question question = instance.getCurrentQuestion().get();
+        logger.debug("Is personal answer: "+ConfigHandler.isPersonalAnswer());
+        if (ConfigHandler.isPersonalAnswer()) {
+            event.setMessageCancelled(true);
+            logger.debug("Message send cancelled");
+        }
         if (this.playerCooldownAnswer.containsKey(sender.getUniqueId())) {
             long time = this.playerCooldownAnswer.get(sender.getUniqueId());
+            logger.debug("cooldown for "+sender.getName()+": "+time);
+            logger.debug("current time: "+System.currentTimeMillis());
             if (System.currentTimeMillis() > time)
                 this.playerCooldownAnswer.remove(sender.getUniqueId());
             else {
@@ -66,19 +75,24 @@ public class EventHandler {
             }
         }
         if (message.endsWith("qt>" + question.getAnswer())) {
+            logger.debug("the answer of the question was found by "+sender.getName());
             QuestionsTime.getInstance().setPlayedQuestion(null);
             if (question.isTimed()) instance.stopTimer();
-            Optional<Prize> prizeOptional = question.getPrize();
+            logger.debug("timer stopped");
             Task.builder().execute(wait -> Sponge.getServer().getOnlinePlayers().forEach(player -> {
-                if (player.getUniqueId().equals(player.getUniqueId()))
+                if (player.getUniqueId().equals(sender.getUniqueId()))
                     player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.ANSWER_WIN)));
                 else
                     player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.ANSWER_WIN_ANNOUNCE).setComponent(MessageComponents.PLAYER_NAME, player).build())));
             })).async().delay(500, TimeUnit.MILLISECONDS)
                     .submit(instance.getContainer().getInstance().get());
+            logger.debug("messages sended");
 
+            Optional<Prize> prizeOptional = question.getPrize();
+            logger.debug("is the question have a prize: "+prizeOptional.isPresent());
             prizeOptional.ifPresent(prize -> {
                 if (prize.getItemStacks().length > 0 || (prize.getMoney() > 0 && instance.getEconomy().isPresent()))
+                    logger.debug("prize will be send");
                     Task.builder().execute(task -> {
                         sender.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.REWARD_ANNOUNCE)));
                         if (prize.getItemStacks().length > 0) {
@@ -118,13 +132,14 @@ public class EventHandler {
             String answer = message.substring(message.lastIndexOf("qt>") + 3);
             sender.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.ANSWER_FALSE)
                     .setComponent(MessageComponents.ANSWER, answer).build())));
-            if (ConfigHandler.isPersonalAnswer())
-                event.setMessageCancelled(true);
+            logger.debug("is timer between answer: "+question.isTimeBetweenAnswer());
             if (question.isTimeBetweenAnswer())
                 this.playerCooldownAnswer.put(sender.getUniqueId(), System.currentTimeMillis() + (question.getTimeBetweenAnswer() * 1000));
             Optional<Malus> malusOptional = question.getMalus();
+            logger.debug("is malus present: "+malusOptional.isPresent());
             malusOptional.ifPresent(malus -> {
                 if (malus.getMoney() > 0 && instance.getEconomy().isPresent()) {
+                    logger.debug("malus will be send");
                     EconomyService economyService = instance.getEconomy().get();
                     sender.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.ANSWER_MALUS)
                             .setComponent(MessageComponents.MONEY, malus.getMoney())

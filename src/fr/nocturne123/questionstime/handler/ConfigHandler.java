@@ -10,6 +10,7 @@ import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
 import ninja.leaping.configurate.objectmapping.ObjectMappingException;
+import org.slf4j.Logger;
 import org.spongepowered.api.command.source.ConsoleSource;
 
 import java.io.File;
@@ -25,6 +26,7 @@ public class ConfigHandler {
 	private static CommentedConfigurationNode configNode;
 	private static final QuestionsTime main = QuestionsTime.getInstance();
 	private static final ConsoleSource console = QuestionsTime.getInstance().getConsole();
+	private static final Logger logger = main.getLogger();
 
 	private static int cooldown;
 	private static boolean isRandom;
@@ -53,12 +55,19 @@ public class ConfigHandler {
 			configFile = path;
 			configLoader = HoconConfigurationLoader.builder().setFile(new File(path.toString(), "config.conf")).build();
 			configNode = configLoader.load();
+			logger.debug("loading config root node...");
 			cooldown = configNode.getNode("cooldown").getInt();
+			logger.debug("cooldown value: "+cooldown);
 			isRandom = configNode.getNode("randomTime").getBoolean();
+			logger.debug("randomTime value: "+isRandom);
 			minCooldown = configNode.getNode("minCooldown").getInt();
+			logger.debug("minCooldown value: "+minCooldown);
 			maxCooldown = configNode.getNode("maxCooldown").getInt();
+			logger.debug("maxCooldown value: "+maxCooldown);
 			personalAnswer = configNode.getNode("personalAnswer").getBoolean();
+			logger.debug("personalAnswer value: "+personalAnswer);
 			minConnected = configNode.getNode("minConnected").getInt();
+			logger.debug("minConnected value: "+minConnected);
 			if(minConnected <= 0)
 				minConnected = 1;
 			if(cooldown <= 0)
@@ -67,12 +76,14 @@ public class ConfigHandler {
 				minCooldown = 200;
 			if(maxCooldown <= 0)
 				maxCooldown = 400;
-			
+
+			logger.debug("loading questions node...");
 			CommentedConfigurationNode questions = configNode.getNode("questions");
 			loadQuestions(questions);
+			logger.debug("config fully loaded");
 			configLoader.save(configNode);
 		} catch (Exception e) {
-			QuestionsTime.getInstance().getConsole().sendMessage(TextUtils.Console.creatorError("Error during loading the config file !"));
+			console.sendMessage(TextUtils.Console.creatorError("Error during loading the config file !"));
 			e.printStackTrace();
 		}
 	}

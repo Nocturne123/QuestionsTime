@@ -112,6 +112,7 @@ public class QuestionTask implements Runnable {
 	}
 
 	private void startTimer(int timerTicks) {
+		System.out.println("START TIMER "+timerTicks);
 		Task task = Task.builder().execute(consumer -> {
 			long secondStarted = instance.getTimerStarted() / 1000;
 			int timeLeft = (int) (timerTicks - secondStarted);

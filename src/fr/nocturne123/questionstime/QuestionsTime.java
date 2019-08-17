@@ -41,7 +41,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.5", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.6", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;
@@ -123,6 +123,7 @@ public class QuestionsTime {
 	}
 	
 	public void sayNewQuestion() {
+		logger.debug("say a new question");
 		if(this.questions.size() > 0) {
 			if(ConfigHandler.isRandomTick())
 				this.startIntervalQuestion();
