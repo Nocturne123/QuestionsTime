@@ -18,14 +18,16 @@ public class Question {
 	private Malus malus;
 	private int timer;
 	private int timeBetweenAnswer;
+	private int weight;
 
 	protected Question(QuestionBuilder builder) {
 	    this.question = builder.question;
 	    this.answer = builder.answer;
 	    this.timer = builder.timer;
 	    this.prize = builder.prize;
-	    this.malus =builder.malus;
+	    this.malus = builder.malus;
 	    this.timeBetweenAnswer = builder.timeBetweenAnswer;
+	    this.weight = builder.weight;
     }
 
     public static QuestionBuilder builder() {
@@ -77,6 +79,10 @@ public class Question {
 		return timeBetweenAnswer;
 	}
 
+	public int getWeight() {
+		return weight;
+	}
+
 	public enum Types {
 		SIMPLE, MULTI, ERROR
 	}
@@ -89,6 +95,7 @@ public class Question {
 		protected Malus malus;
 		protected int timer;
 		protected int timeBetweenAnswer;
+		protected int weight;
 
         public T setQuestion(String question) {
             this.question = question;
@@ -140,11 +147,16 @@ public class Question {
             return (T) this;
         }
 
-        public Question build() {
+		public T setWeight(int weight) {
+			this.weight = weight;
+			return (T) this;
+		}
+
+		public Question build() {
             if(Strings.isNullOrEmpty(this.question))
                 throw new NullPointerException("The question is null or empty");
             if(Strings.isNullOrEmpty(this.answer))
-                throw  new NullPointerException("The answer is null");
+                throw new NullPointerException("The answer is null");
             return new Question(this);
         }
 

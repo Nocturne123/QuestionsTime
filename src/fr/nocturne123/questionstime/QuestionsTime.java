@@ -37,11 +37,9 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
-@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.6", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
+@Plugin(id = "questionstime", name = "QuestionsTime", version = "1.1.7", description = "Ask questions and gain prize for the winner", authors = {"Nocturne123"})
 public class QuestionsTime {
 
 	private static QuestionsTime instance;

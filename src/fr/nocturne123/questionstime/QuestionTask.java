@@ -10,6 +10,7 @@ import fr.nocturne123.questionstime.question.QuestionMulti;
 import fr.nocturne123.questionstime.question.component.Malus;
 import fr.nocturne123.questionstime.question.component.Prize;
 import fr.nocturne123.questionstime.util.TextUtils;
+import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
@@ -32,9 +33,31 @@ public class QuestionTask implements Runnable {
 	@Override
 	public void run() {
 		if(instance.getGame().getServer().getOnlinePlayers().size() >= ConfigHandler.getMinConnected()) {
+			Logger logger = instance.getLogger();
 			Random rand = new Random();
 			ArrayList<Question> questions = instance.getQuestions();
-			Question question = questions.get(rand.nextInt(questions.size()));
+			Question question = null;
+
+			final int totalWeight = questions.stream().mapToInt(Question::getWeight).sum();
+			logger.debug("totalWeight: "+totalWeight);
+			int weight = rand.nextInt(totalWeight);
+			logger.debug("random weight: "+weight);
+			for(Question questionList : questions) {
+				logger.debug("question weight: "+questionList.getWeight());
+				weight -= questionList.getWeight();
+				logger.debug("new weight value: "+weight);
+				if(weight < 0) {
+					question = questionList;
+					logger.debug("question chosen: '"+questionList.getQuestion()+"'");
+					break;
+				}
+			}
+			final Question finalQuestion = question;
+			if(finalQuestion == null) {
+				logger.warn("No questions chosen. It's not normal, please report with debug.log or latest.log");
+				return;
+			}
+
 			Optional<Prize> prizeOptional = question.getPrize();
 			Optional<Malus> malusOptional = question.getMalus();
 			instance.getGame().getServer().getOnlinePlayers().forEach(player -> {
@@ -47,10 +70,10 @@ public class QuestionTask implements Runnable {
 					if(instance.isCreator(player.getUniqueId()))
 						return;
 					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_ASK)
-							.setComponent(MessageComponents.QUESTION, question.getQuestion()).build())));
+							.setComponent(MessageComponents.QUESTION, finalQuestion.getQuestion()).build())));
 					
-					if(question.getType() == Types.MULTI) {
-						QuestionMulti qMulti = (QuestionMulti) question;
+					if(finalQuestion.getType() == Types.MULTI) {
+						QuestionMulti qMulti = (QuestionMulti) finalQuestion;
 						for(int i = 0; i < qMulti.getPropositions().size(); i++)
 							player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_PROPOSITION)
 									.setComponent(MessageComponents.POSITION, (byte) (i+1))
@@ -92,14 +115,14 @@ public class QuestionTask implements Runnable {
 					});
 
 					player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.ANSWER_ANNOUNCE)));
-					if(question.isTimed())
+					if(finalQuestion.isTimed())
 						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.QUESTION_TIMER_END)
-								.setComponent(MessageComponents.TIMER, question.getTimer()).build())));
+								.setComponent(MessageComponents.TIMER, finalQuestion.getTimer()).build())));
 					else
 						player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.QUESTION_END)));
 				});
-				if(question.isTimed()) this.startTimer(question.getTimer());
-				instance.setPlayedQuestion(question);
+				if(finalQuestion.isTimed()) this.startTimer(finalQuestion.getTimer());
+				instance.setPlayedQuestion(finalQuestion);
 			})
 			.async()
 			.delay(3, TimeUnit.SECONDS)

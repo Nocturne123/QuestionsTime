@@ -83,7 +83,7 @@ public class EventHandler {
                 if (player.getUniqueId().equals(sender.getUniqueId()))
                     player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(MessageHandler.Messages.ANSWER_WIN)));
                 else
-                    player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.ANSWER_WIN_ANNOUNCE).setComponent(MessageComponents.PLAYER_NAME, player).build())));
+                    player.sendMessage(Text.join(instance.qtPrefix, MessageHandler.get(Message.builder(MessageHandler.Messages.ANSWER_WIN_ANNOUNCE).setComponent(MessageComponents.PLAYER_NAME, sender).build())));
             })).async().delay(500, TimeUnit.MILLISECONDS)
                     .submit(instance.getContainer().getInstance().get());
             logger.debug("messages sended");

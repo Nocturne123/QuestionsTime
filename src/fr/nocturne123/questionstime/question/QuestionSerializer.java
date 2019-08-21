@@ -29,12 +29,14 @@ public class QuestionSerializer implements TypeSerializer<Question>{
 		String answer = node.getNode("answer").getString();
 		int timer = node.getNode("timer").getInt();
 		int timeBetweenAnswer = node.getNode("time-between-answer").getInt();
+		int weight = node.getNode("weight").getInt(10);
 		ConfigurationNode prize = node.getNode("prize");
 		ConfigurationNode malus = node.getNode("malus");
 
 		if(questioneType == Types.SIMPLE)
 			return Question.builder().setQuestion(question).setPrize(prize).setAnswer(answer)
-					.setMalus(malus).setTimer(timer).setTimeBetweenAnswer(timeBetweenAnswer).build();
+					.setMalus(malus).setTimer(timer).setTimeBetweenAnswer(timeBetweenAnswer)
+					.setWeight(weight).build();
 		else if(questioneType == Types.MULTI) {
 			if(!StringUtils.isNumeric(answer) || Integer.valueOf(answer) > Byte.MAX_VALUE || Integer.valueOf(answer) < 0) {
 				logger.error("The question \""+node.getKey()+"\" answer need to be a number between 0 and 127");
@@ -45,10 +47,10 @@ public class QuestionSerializer implements TypeSerializer<Question>{
 				logger.error("The question \""+node.getKey()+"\" answer need to have at least 2 propositions");
 				return null;
 			}
-			byte answerNumber = Byte.valueOf(answer);
+			byte answerNumber = Byte.parseByte(answer);
             QuestionMulti.QuestionMultiBuilder questionMultiBuilder = QuestionMulti.builder()
                     .setQuestion(question).setPrize(prize).setMalus(malus).setAnswer(answerNumber)
-                    .setTimer(timer).setTimeBetweenAnswer(timeBetweenAnswer);
+                    .setTimer(timer).setTimeBetweenAnswer(timeBetweenAnswer).setWeight(weight);
             propositions.getChildrenList().forEach(proposition -> questionMultiBuilder.addProposition(proposition.getString()));
 			return questionMultiBuilder.build();
 		}
@@ -62,6 +64,7 @@ public class QuestionSerializer implements TypeSerializer<Question>{
 		node.getNode("answer").setValue(question.getAnswer());
 		node.getNode("timer").setValue(question.getTimer());
 		node.getNode("time-between-answer").setValue(question.getTimeBetweenAnswer());
+		node.getNode("weight").setValue(question.getWeight());
 		if(question instanceof QuestionMulti)
 			node.getNode("proposition").setValue(((QuestionMulti) question).getPropositions());
 
